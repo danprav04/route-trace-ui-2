@@ -18,6 +18,7 @@ const EXCLUDED_DIRS = [
 const EXCLUDED_FILES = [
     'package-lock.json',
     'yarn.lock',
+    '.env',
     '.DS_Store'
 ];
 
