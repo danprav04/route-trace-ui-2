@@ -1,3 +1,5 @@
+// ----- File: src/store/slices/routeTraceSlice.js -----
+
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import routeService from '../../services/routeService';
 import { v4 as uuidv4 } from 'uuid';
@@ -12,8 +14,8 @@ const createInitialTraceState = () => ({
   sourceDgStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed', 'manual'
   destinationDgStatus: 'idle', // 'manual' means user edited it after fetch/fail
   traceStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed', 'partial_success'
-  sourceMacTrace: null,
-  destinationMacTrace: null,
+  sourceMacTrace: null, // Expecting format like [{hop: 1, ip: 'mac/ip', name: 'dev', type: 'L2/L3'}, ...] or null
+  destinationMacTrace: null, // Expecting format like [{hop: 1, ip: 'mac/ip', name: 'dev', type: 'L2/L3'}, ...] or null
   mainRouteTrace: null, // Expecting format like [{hop: 1, ip: 'x', name: 'y'}, ...]
   error: null, // Can store string or object for more details
 });
@@ -59,8 +61,8 @@ export const performFullTrace = createAsyncThunk(
         .map(p => p.reason.message || 'Unknown error')
         .join('; ');
 
-      // Determine overall status
-      let status = 'failed';
+      // Determine overall status: Assume failed unless main trace succeeds
+      let status = 'failed'; // Default to failed
       if (mainRouteResult.status === 'fulfilled') {
           status = errors ? 'partial_success' : 'succeeded';
       }
@@ -73,7 +75,7 @@ export const performFullTrace = createAsyncThunk(
       return {
         traceId,
         mainRouteTrace,
-        sourceMacTrace,
+        sourceMacTrace, // Expected to be an array of hops or null
         destinationMacTrace,
         status, // 'succeeded' or 'partial_success'
         error: errors || null // Report partial errors if any
@@ -81,7 +83,7 @@ export const performFullTrace = createAsyncThunk(
 
     } catch (error) {
       // Catches error from the try block (fundamental failure) or rejections if not handled above
-      return rejectWithValue({ message: error.message || 'Full trace failed', traceId });
+      return rejectWithValue({ message: error.message || 'Full trace failed', traceId, errorObj: error }); // Pass original error too if needed
     }
   }
 );
@@ -173,9 +175,12 @@ const routeTraceSlice = createSlice({
            trace.error = `DG Fetch Error (${type}): ${message}`;
         }
       })
+
       // Full Trace Execution
       .addCase(performFullTrace.pending, (state, action) => {
         const { traceId } = action.meta.arg;
+
+
         const trace = state.traces.find(t => t.id === traceId);
         if (trace) {
           trace.traceStatus = 'loading';
@@ -188,6 +193,7 @@ const routeTraceSlice = createSlice({
       })
       .addCase(performFullTrace.fulfilled, (state, action) => {
         const { traceId, mainRouteTrace, sourceMacTrace, destinationMacTrace, status, error } = action.payload;
+
         const trace = state.traces.find(t => t.id === traceId);
         if (trace) {
           trace.traceStatus = status; // 'succeeded' or 'partial_success'
@@ -199,11 +205,16 @@ const routeTraceSlice = createSlice({
       })
       .addCase(performFullTrace.rejected, (state, action) => {
         const { message, traceId } = action.payload;
+
         const trace = state.traces.find(t => t.id === traceId);
         if (trace) {
           trace.traceStatus = 'failed';
           trace.error = message; // Store the main error message
            // Results are already cleared in pending or might be null from failed calls
+           // Ensure results are explicitly null on failure
+           trace.mainRouteTrace = null;
+           trace.sourceMacTrace = null;
+           trace.destinationMacTrace = null;
         }
       });
   },
@@ -211,3 +222,5 @@ const routeTraceSlice = createSlice({
 
 export const { addTraceSection, removeTraceSection, updateTraceInput, resetTraceState } = routeTraceSlice.actions;
 export default routeTraceSlice.reducer;
+
+// ----- End File: src/store/slices/routeTraceSlice.js -----

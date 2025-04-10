@@ -1,0 +1,585 @@
+**File 1: `routers/auth.py`** (from Image 1)
+
+```python
+# routers/auth.py
+
+from fastapi import APIRouter, HTTPException
+from authentication.token_generator import generate_token, verify_token, TokenErrors
+from models import UserG
+from network_g_verification import verify_g
+
+router = APIRouter()
+
+
+@router.post('/verify-device-auth')
+def verify_device_auth(user: UserG):
+    if verify_g(user.username, user.password):
+        token = generate_token('super-duper-secret', user.username, user.password)
+        print(f'A token has been sent for {user.username}')
+        return token
+    raise HTTPException(401, detail='Unable to verify your user with a network device.')
+
+```
+
+**File 2: `database/models.py`** (from Image 2)
+
+```python
+# database/models.py
+
+from sqlalchemy import create_engine, Column, Integer, String, Text, DATETIME, ForeignKey, create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = 'users'
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String(20), nullable=False, unique=True)
+    # password ? - Not shown but likely needed
+
+    routes = relationship("Route", back_populates="user")
+
+class Route(Base):
+    __tablename__ = 'routes'
+
+    id = Column(Integer, primary_key=True)
+    source = Column(String(20), nullable=False)
+    destination = Column(String(20), nullable=False)
+    route = Column(Text)
+    device_additional_info = Column(Text) # Might be JSON/Text
+
+    user_id = Column(Integer, ForeignKey('users.id'))
+    user = relationship("User", back_populates="routes")
+
+    logs = relationship("Log", back_populates="route")
+    timestamp = Column(DATETIME, nullable=False) # Added based on Log timestamp likely
+
+class Log(Base):
+    __tablename__ = 'logs'
+
+    id = Column(Integer, primary_key=True)
+    log = Column(Text, nullable=False)
+    timestamp = Column(DATETIME, nullable=False)
+
+    route_id = Column(Integer, ForeignKey('routes.id'))
+    route = relationship("Route", back_populates="logs")
+
+
+engine = create_engine('sqlite:///./routeace-tufin.db') # Example path
+Base.metadata.create_all(engine)
+
+# Line 46 is the end of the visible file content
+```
+
+**File 3: `routers/user.py`** (from Image 3)
+
+```python
+# routers/user.py
+
+from fastapi import APIRouter, HTTPException, Request
+from authentication.token_generator import verify_token, TokenErrors
+
+router = APIRouter()
+
+
+@router.post('/get-user-routes')
+def get_user_routes(request: Request):
+    token = request.headers['token'] # Assuming token in headers
+    user = verify_token('super-duper-secret', token)
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    # Add logic to get user routes
+    return {'message': f'{user} Routes'}
+
+
+@router.post('/get-user-logs')
+def get_user_logs(request: Request):
+    token = request.headers['token'] # Assuming token in headers
+    user = verify_token('super-duper-secret', token)
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    # Add logic to get user logs
+    return {'message': f'{user} Logs'}
+
+# Line 30 is the end of the visible file content
+```
+
+**File 4: `routers/tufin.py`** (Combined from Images 4, 5, 8, 6, 10 - ordered by line number)
+
+```python
+# routers/tufin.py
+# NOTE: This combines snippets from multiple images. Gaps may exist.
+
+# ... (assuming imports and setup exist before line 87)
+
+@router.get('/get-tufin-route')
+async def get_tufin_route(source_ip_str: str = Query(...), destination_ip_str: str = Query(...), request: Request):
+    """
+    Get the route from Tufin SecureTrack
+
+    Args:
+        - source_ip (str): The source IP address.
+        - destination_ip (str): The destination IP address.
+
+    Returns:
+        - The route from Tufin SecureTrack
+    """
+    token = request.headers['token']
+    user = verify_token('super-secret_key', token) # Assuming 'super-secret_key' matches others
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    # Placeholder for Tufin interaction
+    tufin = SecureTrackAPI() # Assuming instantiation
+    route_from_tufin = await asyncio.to_thread(tufin.get_topology_path, source_ip_str, destination_ip_str)
+    return route_from_tufin
+
+@router.get('/get-default-gateway')
+async def get_default_gateway(ip: str = Query(...), request: Request):
+    """
+    Get the default gateway of an IP address.
+
+    Args:
+        - ip (str): The IP address.
+
+    Returns:
+        - The default gateway of the IP address.
+    """
+    token = request.headers['token']
+    user = verify_token('super-secret_key', token) # Assuming 'super-secret_key' matches others
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    # Assuming FromDatabase class/object exists
+    database = FromDatabase.create_connection_instance() # Placeholder
+    default_gateway = await asyncio.to_thread(FromDatabase.get_default_gateway, database, ip)
+    return default_gateway
+
+@router.get('/get-mac-trace')
+async def get_mac_trace(ip: str = Query(...), dg: str = Query(...), request: Request):
+    """
+    Get the MAC trace from an IP address to its default gateway.
+
+    Args:
+        - ip (str): The IP address.
+        - dg (str): The default gateway.
+
+    Returns:
+        - The MAC trace from the IP address to its default gateway.
+    """
+    token = request.headers['token']
+    user = verify_token('super-secret_key', token) # Assuming 'super-secret_key' matches others
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    # Assuming FromDatabase class/object exists
+    database = FromDatabase.create_connection_instance() # Placeholder
+    tufin = SecureTrackAPI() # Assuming instantiation
+
+    tracer = Tracer(print, user['username'], user['password'], database, tufin) # Placeholder
+
+    mac_trace = await asyncio.to_thread(tracer.find_mac_route_to_endpoint, ip, dg)
+    return {'hop_dict': mac_trace} # Assuming mac_trace is the hop dict
+
+# --- Main Route from Tufin --- (from Image 5)
+@router.get('/get-main-tufin-route')
+async def get_main_tufin_route(source_ip_str: str = Query(...),
+                               destination_ip_str: str = Query(...),
+                               src_vrf: str = Query(None), # Optional
+                               dst_vrf: str = Query(None), # Optional
+                               request: Request):
+    """
+    Get the main route from Tufin SecureTrack
+
+    Args:
+        - source_ip_str (str): The source IP address.
+        - destination_ip_str (str): The destination IP address.
+        - src_vrf (str, optional): The source VRF. Defaults to None.
+        - dst_vrf (str, optional): The destination VRF. Defaults to None.
+
+    Returns:
+        - The main route from Tufin SecureTrack
+    """
+    token = request.headers['token']
+    user = verify_token('super-secret_key', token) # Assuming 'super-secret_key' matches others
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    tufin = SecureTrackAPI() # Assuming instantiation
+    # Assuming extract_main_route exists
+    main_route = await asyncio.to_thread(tufin.get_topology_path, source_ip_str, destination_ip_str) # Simplified placeholder
+    # main_route = await asyncio.to_thread(extract_main_route_from_tufin, destination_ip_str, src_vrf) # More complex placeholder if needed
+    return main_route
+
+# ... (Gap between line ~168 and ~206)
+
+# --- Get Route Trace --- (from Image 8)
+@router.get('/get-route-trace')
+async def get_route_trace(source_ip: str = Query(...),
+                         source_dg_name: str = Query(...), # Assuming name relates to DG lookup
+                         source_dg_ip: str = Query(...),   # Explicit DG IP
+                         destination_ip: str = Query(...),
+                         destination_dg_name: str = Query(...), # Assuming name relates to DG lookup
+                         destination_dg_ip: str = Query(...), # Explicit DG IP
+                         vrf: str = Query(None), # Optional VRF
+                         request: Request):
+    """
+    Get the route trace from a source IP to a destination IP.
+
+    Args:
+        - source_ip (str): The source IP address.
+        - source_dg_name (str): The name of the source data group. (?)
+        - source_dg_ip (str): The IP of the source data group. (?)
+        - destination_ip (str): The destination IP address.
+        - destination_dg_name (str): The name of the destination data group. (?)
+        - destination_dg_ip (str): The IP of the destination data group. (?)
+        - vrf (str, optional): The VRF name. Defaults to None.
+
+    Returns:
+        - The route trace from the source IP to the destination IP.
+    """
+    token = request.headers['token']
+    user = verify_token('super-secret_key', token) # Assuming 'super-secret_key' matches others
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    # Assuming FromDatabase class/object exists
+    database = FromDatabase.create_connection_instance() # Placeholder
+    tracer = Tracer(print, user['username'], user['password'], database, None) # Placeholder, Tufin might not be needed here
+
+    # Assuming get_device_name_by_ip exists
+    source_name = await asyncio.to_thread(FromDatabase.get_device_name_by_ip, database, source_ip)
+    # Assuming find_mac_route_to_endpoint exists
+    route_trace = await asyncio.to_thread(tracer.find_mac_route_to_endpoint, source_ip, destination_ip, source_dg=source_dg_ip, destination_dg=destination_dg_ip, vrf=vrf) # Adjusted tracer call based on variable names
+
+    return {'hop_dict': route_trace} # Assuming route_trace is the hop dict
+
+# --- Find Route (Tufin / DB) --- (from Image 8, continued in Image 6)
+@router.get('/find-route/{source_ip}/{destination_ip}')
+async def find_route_tufin(source_ip: str, destination_ip: str, request: Request):
+    token = request.headers['token']
+    user = verify_token('super-secret_key', token) # Assuming 'super-secret_key' matches others
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    # Check DB first (assuming db object and get_route exist)
+    db_route = db.get_route(source_ip, destination_ip) # Placeholder
+    if db_route:
+        return json.loads(db_route.route) # Assuming route stored as JSON string
+
+    # If not in DB, query Tufin and potentially store
+    # Assuming db object and add_route exist
+    # Assuming FromDatabase class/object exists
+    database = FromDatabase.create_connection_instance() # Placeholder
+    tufin = SecureTrackAPI() # Assuming instantiation
+    tracer = Tracer(print, user['username'], user['password'], database, tufin) # Placeholder
+
+    # --- Step 1 --- Get base route from Tufin and get available default gateways from Trino
+    print(f'Getting route from Tufin: {source_ip} -> {destination_ip}')
+    # Assuming get_topology_path exists
+    tufin_path_task = asyncio.create_task(asyncio.to_thread(tufin.get_topology_path, source_ip, destination_ip))
+    # tufin_path = await tufin_path_task # Await later if needed concurrently
+    print("Route from Tufin:")
+    # print(route_from_tufin) # Debug print
+    # return route_from_tufin # Original simpler return
+
+    # Get Default Gateways Concurrently
+    async def get_default_gateway_wrapper(ip: str):
+        default_gateway = await asyncio.to_thread(FromDatabase.get_default_gateway, database, ip) # Pass database instance
+        print(f"Default gateway of {ip}: {default_gateway}")
+        return default_gateway
+
+    source_dg_task = asyncio.create_task(get_default_gateway_wrapper(source_ip))
+    destination_dg_task = asyncio.create_task(get_default_gateway_wrapper(destination_ip))
+
+    # Get MAC Traces Concurrently
+    async def get_mac_trace_wrapper(ip: str, dg: str):
+        # Need dg value, await the dg tasks first or handle potential None
+        if not dg:
+             print(f"Cannot get MAC trace for {ip} without default gateway.")
+             return None # Or handle error appropriately
+        print(f"Getting MAC trace for {ip} to {dg}")
+        mac_trace = await asyncio.to_thread(tracer.find_mac_route_to_endpoint, ip, dg) # Pass tracer instance
+        return {'hop_dict': mac_trace} # Wrap in dict as before?
+
+    # Wait for needed results
+    tufin_path = await tufin_path_task
+    source_dg = await source_dg_task
+    destination_dg = await destination_dg_task
+
+    # Now start MAC trace tasks if gateways found
+    source_mac_trace_task = asyncio.create_task(get_mac_trace_wrapper(source_ip, source_dg)) if source_dg else None
+    destination_mac_trace_task = asyncio.create_task(get_mac_trace_wrapper(destination_ip, destination_dg)) if destination_dg else None
+
+    # Wait for MAC traces
+    source_mac_trace_res = await source_mac_trace_task if source_mac_trace_task else None
+    destination_mac_trace_res = await destination_mac_trace_task if destination_mac_trace_task else None
+
+    # --- Step 2 --- Parse Tufin path (from Image 10)
+    # Assuming SecureTrackAPI.extract_main_route exists
+    tufin_path_parsed = SecureTrackAPI.extract_main_route(tufin_path, destination_ip) # Placeholder, might need more args
+
+    path = {'main_route': tufin_path_parsed} # Start building final path object
+
+    source_dg_info = None
+    if source_dg:
+        source_dg_info = {
+            "ip": source_dg, # Assuming source_dg holds the IP string
+            "name": "source_dg", # Placeholder name
+            "vrf": None # Placeholder vrf
+        }
+        path['source_dg'] = source_dg_info
+    else:
+        # Handle case where source default gateway couldn't be identified
+        print("Exception(\"Couldn't identify source default gateway.\")") # Log or raise actual exception
+
+    follow_destination = destination_ip # Initialize follow destination
+
+    if destination_dg:
+        destination_dg_info = {
+            "ip": destination_dg, # Assuming destination_dg holds the IP string
+            "name": "destination_dg", # Placeholder name
+            "vrf": None # Placeholder vrf
+        }
+        path['destination_dg'] = destination_dg_info
+        follow_destination = destination_dg # Update follow destination if DG found
+    else:
+        # Handle case where destination default gateway couldn't be identified
+        print("Exception(\"Couldn't identify destination default gateway.\")") # Log or raise actual exception
+
+
+    # --- Step 3 --- Find network route (from Image 10, continued)
+    # Get the trace results (hop dicts)
+    dg_to_source_trace = source_mac_trace_res['hop_dict'] if source_mac_trace_res else None
+    dg_to_destination_trace = destination_mac_trace_res['hop_dict'] if destination_mac_trace_res else None
+
+    # Assuming find_route_dg_to_dg exists in tracer
+    new_route = {'hop_dict': await asyncio.to_thread(tracer.find_route_dg_to_dg,
+                                                    source_dg_info, # Pass the dict if needed
+                                                    follow_destination, # Use updated destination target
+                                                    destination_dg_info)} # Pass the dict if needed
+
+    # --- Step 4 --- Combine Routes (from Image 10, continued)
+    firewall_index = -1
+    firewall_nodes = []
+    # Assuming 'main_route' is a list of hops/nodes
+    if len(path['main_route']) > 1:
+        for i, d in enumerate(path['main_route']):
+             # Assuming 'type' field exists and indicates firewall
+            if d.get('type') == 'sgw': # Example type check
+                firewall_index = i
+                firewall_nodes.append(d) # Store firewall node info
+                break # Assuming only first firewall is needed? Logic unclear
+
+    # If firewall exists, insert 'new_route' before it
+    if firewall_index != -1 and new_route:
+        # path['main_route'] = path['main_route'][:firewall_index] + new_route['hop_dict'] + path['main_route'][firewall_index:]
+        # More sophisticated merge might be needed depending on structure
+        print("Firewall detected - merging logic placeholder") # Placeholder for complex merge
+    else:
+        # If no firewall, append? Or replace? Logic unclear. Assume append for now.
+        # path['main_route'].extend(new_route['hop_dict'])
+        print("No firewall detected - merging logic placeholder") # Placeholder
+
+
+    if source_dg_info and dg_to_source_trace:
+        # Insert source trace at the beginning
+        # Assuming _insert_list_between_indexes exists (from utils?)
+        # path['main_route'] = _insert_list_between_indexes(path['main_route'], dg_to_source_trace, -1, 0) # Insert before index 0
+        print("Prepending source trace - merging logic placeholder") # Placeholder
+
+    if destination_dg_info and dg_to_destination_trace:
+        # Append destination trace at the end
+        # path['main_route'].extend(dg_to_destination_trace)
+        print("Appending destination trace - merging logic placeholder") # Placeholder
+
+    # --- Step 5 --- Update Database (from Image 10)
+    db.update_route(source_ip, destination_ip, json.dumps(path)) # Update or add route
+
+    return path # Return the combined path
+
+# ... (rest of the file, if any)
+```
+
+**File 5: `utils_snippet.py`** (Implied filename based on functions, from Image 7 - Context suggests it might be part of `routers/route.py` or a separate utils file)
+
+```python
+# utils_snippet.py (or potentially part of routers/route.py)
+
+import json # Assuming json is used based on db operations elsewhere
+# Assuming Device, LoadedDbRoute, RouteModel are defined classes/models
+
+def route_response_format(db_route: LoadedDbRoute): # Type hint based on var name
+    """ Formats DB route for API response """
+    return {"route": json.loads(db_route.route), # Parse JSON string
+            "device": json.loads(db_route.device), # Parse JSON string
+            "timestamp": db_route.timestamp}
+
+
+def _insert_list_between_indexes(original_list: list, list_to_insert: list, start_index: int, end_index: int):
+    """
+    Inserts a list between two indexes in another list.
+
+    Args:
+        original_list (list): The list the insertion will be made into.
+        list_to_insert (list): The list to be inserted.
+        start_index (int): The index before which the insertion starts.
+        end_index (int): The index which the insertion starts after. (?) Doc seems reversed/confusing
+
+    Returns:
+        The modified list with the insertion.
+    """
+    # Ensure indexes are valid
+    if start_index < 0 or end_index >= len(original_list) or start_index >= end_index:
+         raise ValueError("Invalid Indexes")
+
+    # Build the result list in three parts: before start_index, the inserted list, and after end_index
+    # Logic seems slightly off based on typical insert; assuming intent is to replace slice or insert *at* an index
+    # Let's assume insertion *at* start_index, replacing elements up to end_index?
+    # Re-interpreting based on common list ops: insert `list_to_insert` *at* `start_index + 1` ?
+    # Let's assume the goal is: result = original[:start_index+1] + list_to_insert + original[end_index:]
+
+    # Original implementation based on visual interpretation:
+    before = original_list[:start_index+1] # Elements up to and including start_index
+    after = original_list[end_index:]    # Elements from end_index onwards
+    result = before + list_to_insert + after
+    return result
+
+
+def gap_fill(path, gap_fill):
+    """ Fills gaps in a path based on gap_fill data """
+    # Assuming path['main_route'] exists and is a list of hops
+    # Assuming gap_fill is a list of fill segments
+    start = main_route_hop_index = 0
+    for hop in path['main_route']:
+        main_route_hop_index += 1
+        for fill in gap_fill:
+            # Assuming hops and fills have 'source_id' and 'destination_id'
+            if hop.get('source_id') == fill.get('start_id') and fill.get('destination_id') == path['main_route'][main_route_hop_index].get('end_id'): # Check next hop ID
+                fill = fill['path'] # Assuming the actual path data is nested
+                start = main_route_hop_index
+                if len(fill) == 0:
+                    break
+                end = start + len(fill) # Calculate end index based on fill length
+                # network = fill[0]['?'] # Logic unclear for 'network'
+                # path['main_route'] = _insert_list_between_indexes(path['main_route'], fill, start-1, start) # Insert fill at 'start' index
+                # Placeholder for insertion logic
+                print(f"Gap fill needed between index {start-1} and {start}")
+                # Adjust main index after insertion?
+                main_route_hop_index += len(fill) # Skip over inserted elements
+    return path # Return modified path
+
+
+def _is_firewall_in_tufin_route(route):
+    """ Checks if a firewall ('sgw') exists in the route """
+    for index, hop in enumerate(route):
+        if hop.get('type') == 'sgw': # Check for firewall type
+            return index # Return index if found
+    return False # Return False if not found
+
+# --- Get Tufin Route --- (Potentially another endpoint if this IS route.py)
+@router.get('/get-tufin-route') # Duplicate endpoint name from tufin.py? Needs unique path
+async def get_tufin_route_alt(request: Request): # Renamed function to avoid clash
+    # ... implementation ...
+    pass
+
+# Line 82 is the end of the visible file content
+```
+
+**File 6: `routers/route.py`** (from Image 9)
+
+```python
+# routers/route.py
+# NOTE: This starts mid-file. Assumes imports and router setup exist above.
+# It might also include the functions shown in Image 7 (`utils_snippet.py` above).
+
+# ... (previous endpoints, potentially including functions from Image 7)
+
+@router.post('/get-all-routes')
+def get_all_routes(request: Request):
+    token = request.headers['token']
+    user = verify_token('super-duper-secret', token)
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    # Assuming db object and get_all_routes method exist
+    routes = db.get_all_routes() # Placeholder
+    # Assuming route_response_format exists (potentially from Image 7 content)
+    return [route_response_format(route) for route in routes]
+
+
+@router.post('/get-user-routes') # Duplicate endpoint name from user.py? Needs unique path/logic
+def get_user_routes_alt(request: Request): # Renamed function
+    token = request.headers['token']
+    user = verify_token('super-duper-secret', token)
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    # Assuming db object and get_user_routes method exist
+    routes = db.get_user_routes(user['username']) # Pass username from verified token
+    # Assuming route_response_format exists
+    return [route_response_format(route) for route in routes]
+
+
+@router.post('/delete-route')
+def delete_route(route_delete: RouteDelete, request: Request): # Assuming RouteDelete Pydantic model exists
+    token = request.headers['token']
+    user = verify_token('super-duper-secret', token)
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    # Assuming db object and delete_route method exist
+    db.delete_route(route_delete.source_ip, route_delete.destination_ip) # Pass params from request body model
+    return {'message': 'Route deleted successfully'}
+
+
+@router.get('/get-route-by-id/{route_id}')
+def get_route_by_id(route_id: str, request: Request): # route_id passed as path parameter
+    # Basic validation: Check if route_id is numeric before DB query
+    if not route_id.isnumeric():
+         raise HTTPException(400, detail='Route ID should be numeric.')
+
+    token = request.headers['token']
+    user = verify_token('super-duper-secret', token)
+    if user == TokenErrors.Expired:
+        raise HTTPException(401, detail='Expired token.')
+    if user == TokenErrors.Invalid:
+        raise HTTPException(401, detail='Invalid token.')
+
+    # Assuming db object and get_route_by_id method exist
+    route = db.get_route_by_id(int(route_id)) # Convert ID to int
+    if route is None:
+        raise HTTPException(404, detail='Route not found')
+    # Assuming route_response_format exists
+    return route_response_format(route)
+
+# Line 426 is the end of the visible file content
+```
+
+This transcription is based on the visible code in the images. There might be parts of the files not shown, and OCR isn't perfect, so minor errors could exist, especially with indentation or similar characters. The `tufin.py` file, in particular, was pieced together from multiple non-contiguous snippets.

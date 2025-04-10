@@ -22,14 +22,11 @@ class UserLogin(BaseModel):
 
 class Hop(BaseModel):
     hop: int
-    ip: str
-    name: str
-    type: str # e.g., 'router', 'firewall', 'switch'
+    ip: str       # Can represent IP or MAC address for MAC trace
+    name: str     # Device name or description
+    type: str     # e.g., 'router', 'firewall', 'switch', 'L2 Switch', 'L3 Router'
 
-class MacHop(BaseModel): # Example structure for MAC trace
-    hop: int
-    device: str
-    mac: str
+# MacHop model is removed as we now use Hop for MAC traces too
 
 class RouteHistoryEntry(BaseModel):
     id: int
@@ -102,7 +99,8 @@ async def get_default_gateway(ip: str = Query(...)):
     if len(parts) == 4:
         try:
             last_octet = int(parts[3])
-            gw_last_octet = (last_octet // 254) * 254 + 1 # e.g., 1-253 -> 1, 254 -> 1
+            # Ensure gateway is different from IP but typically .1 or .254
+            gw_last_octet = 1 if last_octet > 1 else 254
             gateway_ip = f"{parts[0]}.{parts[1]}.{parts[2]}.{gw_last_octet}"
             print(f"Returning dummy DG: {gateway_ip}")
             return gateway_ip
@@ -115,9 +113,9 @@ async def get_default_gateway(ip: str = Query(...)):
     return fallback_gw
 
 
-@app.get("/get-mac-trace", summary="Get MAC Trace", response_model=List[MacHop])
+@app.get("/get-mac-trace", summary="Get MAC Trace", response_model=List[Hop]) # Changed response_model
 async def get_mac_trace(ip: str = Query(...), dg: str = Query(...)):
-    """Simulates a MAC trace between an IP and its gateway."""
+    """Simulates a MAC/Layer2/Layer3 trace between an IP and its gateway."""
     print(f"Requesting MAC trace: {ip} <-> {dg}")
     await asyncio.sleep(0.6 + random.uniform(0, 0.4)) # Simulate trace delay
 
@@ -125,15 +123,19 @@ async def get_mac_trace(ip: str = Query(...), dg: str = Query(...)):
         print("(!) Simulating MAC trace error")
         raise HTTPException(status_code=500, detail="Simulated backend error during MAC trace")
 
-    # Generate some dummy MAC hops
+    # Generate some dummy hops using the Hop model
     hops = []
-    num_hops = random.randint(1, 3)
+    num_hops = random.randint(1, 3) # Usually few L2/L3 hops between host and DG
     for i in range(1, num_hops + 1):
-        mac = ":".join([f"{random.randint(0, 255):02X}" for _ in range(6)])
-        device_type = random.choice(["Switch", "Router", "Firewall"])
-        hops.append(MacHop(hop=i, device=f"{device_type}-{chr(65+i)}{random.randint(1,5)}", mac=mac))
+        # Simulate MAC address for 'ip' field
+        mac_or_ip = ":".join([f"{random.randint(0, 255):02X}" for _ in range(6)]) if i < num_hops else dg # Last hop is often the DG IP
+        device_type = random.choice(["L2 Switch", "L3 Router", "Firewall"])
+        device_name = f"{device_type}-{chr(65+i)}{random.randint(1,5)}"
+        hop_type = device_type # Use device type as hop type
 
-    print(f"Returning {len(hops)} dummy MAC hops")
+        hops.append(Hop(hop=i, ip=mac_or_ip, name=device_name, type=hop_type))
+
+    print(f"Returning {len(hops)} dummy MAC hops (using Hop model)")
     return hops
 
 
@@ -175,6 +177,7 @@ async def get_route_trace(
         elif i == 1: # First hop often DG
             hop_ip = source_dg if source_dg else f"10.{current_subnet}.0.1"
             hop_name = "source-dg-router"
+            hop_type = "router" # Assume DG is a router
 
         hops_data.append(Hop(hop=i, ip=hop_ip, name=hop_name, type=hop_type))
         if random.random() < 0.3: # Sometimes change subnet mid-trace
@@ -186,7 +189,8 @@ async def get_route_trace(
     # In a real app, this happens in the database logic called by the endpoint
     try:
         dummy_route_counter += 1
-        route_json_str = json.dumps([hop.dict() for hop in hops_data])
+        # Convert each Hop object to a dictionary before dumping to JSON
+        route_json_str = json.dumps([hop.model_dump() for hop in hops_data])
         device_info_json_str = json.dumps({"vrf": vrf, "source_dg": source_dg, "destination_ip_resolved_name": f"dest-{random.randint(1,100)}.example.com"})
         history_entry = RouteHistoryEntry(
             id=dummy_route_counter,
@@ -250,4 +254,6 @@ async def read_root():
 if __name__ == "__main__":
     import uvicorn
     print("Starting dummy backend server on http://localhost:8000")
+    # Use reload=True for development convenience if uvicorn is installed globally
+    # uvicorn.run("dummy_main:app", host="0.0.0.0", port=8000, reload=True)
     uvicorn.run(app, host="0.0.0.0", port=8000)
