@@ -18,7 +18,9 @@ import {
     Tooltip
 } from '@mui/material';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import RouteIcon from '@mui/icons-material/Route'; // For Trace Route
+import RouteIcon from '@mui/icons-material/Route'; // For Combined Trace Route
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // For MAC Trace
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck'; // For Direct Route Trace
 import HistoryIcon from '@mui/icons-material/History'; // For My History
 import PeopleIcon from '@mui/icons-material/People'; // For All Routes
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -38,8 +40,11 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
         navigate('/login'); // Redirect to login after logout
     };
 
+    // Updated Menu Items
     const menuItems = [
-        { text: 'Trace Route', icon: <RouteIcon />, path: '/' },
+        { text: 'Combined Trace', icon: <RouteIcon />, path: '/' },
+        { text: 'Direct Route Trace', icon: <NetworkCheckIcon />, path: '/direct-route-trace' },
+        { text: 'MAC Trace', icon: <SettingsEthernetIcon />, path: '/mac-trace' },
         { text: 'My History', icon: <HistoryIcon />, path: '/history' },
         { text: 'All Routes', icon: <PeopleIcon />, path: '/all-routes' },
     ];

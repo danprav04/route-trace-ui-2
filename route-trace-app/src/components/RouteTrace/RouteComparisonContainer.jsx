@@ -1,10 +1,10 @@
-import React from 'react';
-import { useSelector } from 'react-redux';
-import { Box, Grid } from '@mui/material';
-import RouteTraceSection from './RouteTraceSection';
+// ----- File: src/components/RouteTrace/RouteComparisonContainer.jsx -----
 
-const RouteComparisonContainer = () => {
-  const traces = useSelector((state) => state.routeTrace.traces);
+import React from 'react';
+import { Box, Grid } from '@mui/material';
+
+// Now accepts traces and the specific Section Component to render as props
+const RouteComparisonContainer = ({ traces = [], SectionComponent }) => {
   const canRemove = traces.length > 1;
 
   // Determine grid sizing based on number of traces
@@ -12,12 +12,18 @@ const RouteComparisonContainer = () => {
   if (traces.length === 2) mdSize = 6;
   if (traces.length >= 3) mdSize = 4; // Max 3 side-by-side on medium screens
 
+  if (!SectionComponent) {
+    console.error("RouteComparisonContainer requires a SectionComponent prop.");
+    return <Box sx={{ color: 'error.main' }}>Error: SectionComponent not provided.</Box>;
+  }
+
   return (
     <Box>
       <Grid container spacing={3}>
         {traces.map((trace) => (
           <Grid item xs={12} md={mdSize} key={trace.id}>
-             <RouteTraceSection trace={trace} canRemove={canRemove} />
+             {/* Render the passed-in SectionComponent */}
+             <SectionComponent trace={trace} canRemove={canRemove} />
           </Grid>
         ))}
       </Grid>
@@ -26,3 +32,5 @@ const RouteComparisonContainer = () => {
 };
 
 export default RouteComparisonContainer;
+
+// ----- End File: src/components/RouteTrace/RouteComparisonContainer.jsx -----

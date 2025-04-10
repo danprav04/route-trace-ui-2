@@ -15,7 +15,9 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import LoginPage from './pages/LoginPage';
-import RouteTracePage from './pages/RouteTracePage';
+import RouteTracePage from './pages/RouteTracePage'; // Combined Trace
+import MacTracePage from './pages/MacTracePage'; // New MAC Trace
+import DirectRouteTracePage from './pages/DirectRouteTracePage'; // New Direct Route Trace
 import HistoryPage from './pages/HistoryPage';
 import AllRoutesPage from './pages/AllRoutesPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -68,7 +70,6 @@ function App() {
   );
 
   // Create the theme based on the current mode
-  // Use createTheme directly with the result of getDesignTokens
   const theme = useMemo(() => createTheme(getDesignTokens(mode)), [mode]);
 
   return (
@@ -92,13 +93,12 @@ function App() {
           component="main"
           sx={{
             flexGrow: 1,
-            // Add padding top to account for AppBar height only if AppBar is rendered
             pt: isAuthenticated ? `calc(${theme.mixins.toolbar.minHeight}px + ${theme.spacing(3)})` : theme.spacing(3),
             pb: 3, // Bottom padding
             px: 3, // Horizontal padding
-            width: isAuthenticated ? { md: `calc(100% - ${drawerWidth}px)` } : '100%', // Adjust width if drawer is present
-            ml: isAuthenticated ? { md: `${drawerWidth}px` } : 0, // Ensure content doesn't overlap with permanent drawer on desktop
-            transition: theme.transitions.create(['margin', 'width'], { // Smooth transition for sidebar appearance
+            width: isAuthenticated ? { md: `calc(100% - ${drawerWidth}px)` } : '100%',
+            ml: isAuthenticated ? { md: `${drawerWidth}px` } : 0,
+            transition: theme.transitions.create(['margin', 'width'], {
                  easing: theme.transitions.easing.sharp,
                  duration: theme.transitions.duration.leavingScreen,
             }),
@@ -108,11 +108,11 @@ function App() {
            {isAuthenticated && (
                 <AppBar
                     position="fixed"
-                    elevation={1} // Consistent with theme definition
+                    elevation={1}
                     sx={{
-                        width: { md: `calc(100% - ${drawerWidth}px)` }, // Only cover main content area on desktop
-                        ml: { md: `${drawerWidth}px` }, // Position correctly next to drawer on desktop
-                        display: { xs: 'block', md: 'none' } // Only show AppBar on mobile where sidebar is temporary
+                        width: { md: `calc(100% - ${drawerWidth}px)` },
+                        ml: { md: `${drawerWidth}px` },
+                        display: { xs: 'block', md: 'none' }
                     }}
                 >
                     <Toolbar>
@@ -121,28 +121,40 @@ function App() {
                             aria-label="open drawer"
                             edge="start"
                             onClick={handleDrawerToggle}
-                            sx={{ mr: 2, display: { md: 'none' } }} // Show only on mobile
+                            sx={{ mr: 2, display: { md: 'none' } }}
                         >
                             <MenuIcon />
                         </IconButton>
                         <Typography variant="h6" noWrap component="div">
-                            RouteTrace {/* You can make this dynamic based on page */}
+                            RouteTrace {/* Title can be dynamic */}
                         </Typography>
                     </Toolbar>
                 </AppBar>
             )}
 
-
-          {/* Container for centering and max-width (optional, adjust maxWidth as needed) */}
-          {/* Using Container might add extra padding, check if needed or just use the Box */}
-          {/* <Container maxWidth="xl"> */}
              <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route
-                    path="/"
+                    path="/" // Combined Trace (Original)
                     element={
                     <ProtectedRoute>
                         <RouteTracePage />
+                    </ProtectedRoute>
+                    }
+                />
+                 <Route
+                    path="/mac-trace" // New MAC Trace
+                    element={
+                    <ProtectedRoute>
+                        <MacTracePage />
+                    </ProtectedRoute>
+                    }
+                />
+                 <Route
+                    path="/direct-route-trace" // New Direct Route Trace
+                    element={
+                    <ProtectedRoute>
+                        <DirectRouteTracePage />
                     </ProtectedRoute>
                     }
                 />
@@ -158,14 +170,12 @@ function App() {
                     path="/all-routes"
                     element={
                     <ProtectedRoute>
-                        {/* Add role check here if needed in future */}
                         <AllRoutesPage />
                     </ProtectedRoute>
                     }
                 />
                 <Route path="*" element={<NotFoundPage />} />
              </Routes>
-          {/* </Container> */}
         </Box>
       </Box>
     </ThemeProvider>
