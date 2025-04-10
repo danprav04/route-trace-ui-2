@@ -11,29 +11,28 @@ import {
     IconButton,
     Typography,
     Container,
-    createTheme // Need createTheme if not directly using the function result
+    createTheme
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import LoginPage from './pages/LoginPage';
 import RouteTracePage from './pages/RouteTracePage'; // Combined Trace
-import MacTracePage from './pages/MacTracePage'; // New MAC Trace
-import DirectRouteTracePage from './pages/DirectRouteTracePage'; // New Direct Route Trace
+import MacTracePage from './pages/MacTracePage'; // MAC Trace
+import DirectRouteTracePage from './pages/DirectRouteTracePage'; // Direct Route Trace
 import HistoryPage from './pages/HistoryPage';
 import AllRoutesPage from './pages/AllRoutesPage';
+import ComparisonPage from './pages/ComparisonPage'; // <-- Import the new Comparison Page
 import NotFoundPage from './pages/NotFoundPage';
-import Sidebar from './components/Common/Sidebar'; // Import the new Sidebar
+import Sidebar from './components/Common/Sidebar';
 import { useAuth } from './hooks/useAuth';
-import getDesignTokens from './theme'; // Import theme config function
+import getDesignTokens from './theme';
 
-const drawerWidth = 240; // Define drawer width here
+const drawerWidth = 240;
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
 
   if (!isAuthenticated) {
-    // Redirect them to the /login page, but save the current location they were
-    // trying to go to. This allows us to send them back after login.
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -43,9 +42,7 @@ function ProtectedRoute({ children }) {
 function App() {
   const { isAuthenticated } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  // State to manage theme mode. Could use localStorage for persistence.
   const [mode, setMode] = useState(() => {
-      // Example: Read initial mode from localStorage or default to 'light'
       const savedMode = localStorage.getItem('themeMode');
       return savedMode === 'dark' ? 'dark' : 'light';
   });
@@ -54,13 +51,11 @@ function App() {
     setMobileOpen(!mobileOpen);
   };
 
-  // Theme switching logic
   const colorMode = useMemo(
     () => ({
       toggleColorMode: () => {
         setMode((prevMode) => {
           const newMode = prevMode === 'light' ? 'dark' : 'light';
-          // Example: Persist mode to localStorage
           localStorage.setItem('themeMode', newMode);
           return newMode;
         });
@@ -69,15 +64,13 @@ function App() {
     [],
   );
 
-  // Create the theme based on the current mode
   const theme = useMemo(() => createTheme(getDesignTokens(mode)), [mode]);
 
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline /> {/* Apply baseline styles & background based on theme */}
+      <CssBaseline />
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
 
-        {/* Render Sidebar only if authenticated */}
         {isAuthenticated && (
           <Sidebar
             drawerWidth={drawerWidth}
@@ -88,23 +81,23 @@ function App() {
           />
         )}
 
-        {/* Main content area */}
         <Box
           component="main"
           sx={{
             flexGrow: 1,
             pt: isAuthenticated ? `calc(${theme.mixins.toolbar.minHeight}px + ${theme.spacing(3)})` : theme.spacing(3),
-            pb: 3, // Bottom padding
-            px: 3, // Horizontal padding
+            pb: 3,
+            px: 3,
             width: isAuthenticated ? { md: `calc(100% - ${drawerWidth}px)` } : '100%',
             ml: isAuthenticated ? { md: `${drawerWidth}px` } : 0,
             transition: theme.transitions.create(['margin', 'width'], {
                  easing: theme.transitions.easing.sharp,
                  duration: theme.transitions.duration.leavingScreen,
             }),
+            // Ensure main content area can scroll if needed
+            overflowY: 'auto',
           }}
         >
-           {/* AppBar for mobile toggle and title */}
            {isAuthenticated && (
                 <AppBar
                     position="fixed"
@@ -126,7 +119,7 @@ function App() {
                             <MenuIcon />
                         </IconButton>
                         <Typography variant="h6" noWrap component="div">
-                            RouteTrace {/* Title can be dynamic */}
+                            RouteTrace
                         </Typography>
                     </Toolbar>
                 </AppBar>
@@ -135,7 +128,7 @@ function App() {
              <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route
-                    path="/" // Combined Trace (Original)
+                    path="/" // Combined Trace
                     element={
                     <ProtectedRoute>
                         <RouteTracePage />
@@ -143,7 +136,7 @@ function App() {
                     }
                 />
                  <Route
-                    path="/mac-trace" // New MAC Trace
+                    path="/mac-trace" // MAC Trace
                     element={
                     <ProtectedRoute>
                         <MacTracePage />
@@ -151,10 +144,19 @@ function App() {
                     }
                 />
                  <Route
-                    path="/direct-route-trace" // New Direct Route Trace
+                    path="/direct-route-trace" // Direct Route Trace
                     element={
                     <ProtectedRoute>
                         <DirectRouteTracePage />
+                    </ProtectedRoute>
+                    }
+                />
+                {/* Add the new Comparison Page route */}
+                 <Route
+                    path="/comparison"
+                    element={
+                    <ProtectedRoute>
+                        <ComparisonPage />
                     </ProtectedRoute>
                     }
                 />

@@ -1,43 +1,40 @@
 // ----- File: src/pages/RouteTracePage.jsx -----
 
 import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { Button, Box, Typography } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
-import RouteTraceSection from '../components/RouteTrace/RouteTraceSection'; // Import the specific section for this page
-import { addTraceSection } from '../store/slices/routeTraceSlice'; // Use the correct slice action for this page
+import { useSelector } from 'react-redux';
+import { Box, Typography, Paper } from '@mui/material';
+// Remove Button, AddIcon, RouteComparisonContainer, RouteTraceSection imports
+import RouteInputForm from '../components/RouteTrace/RouteInputForm'; // Import the form
+import RouteVisualizer from '../components/RouteTrace/RouteVisualizer'; // Import the visualizer
 
 const RouteTracePage = () => {
-    const dispatch = useDispatch();
-    // Select state from the original routeTrace slice
-    const traces = useSelector((state) => state.routeTrace.traces);
+    // Select the single trace state object directly
+    const trace = useSelector((state) => state.routeTrace.trace); // Access the single trace state
 
-    const handleAddRoute = () => {
-        dispatch(addTraceSection()); // Dispatch action from routeTraceSlice
+    // No need for handleAddRoute or dispatching add/remove actions anymore
+
+    // Ensure trace exists before rendering (should always exist based on slice initial state)
+    if (!trace) {
+        return <Typography>Loading trace state...</Typography>; // Or some loading indicator
     }
 
-  return (
-    <Box>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Trace Network Route (Combined) {/* Added (Combined) for clarity */}
-      </Typography>
+    return (
+        <Box>
+            <Typography variant="h4" component="h1" gutterBottom>
+                Trace Network Route (Combined)
+            </Typography>
 
-      {/* Pass the correct SectionComponent prop */}
-      <RouteComparisonContainer traces={traces} SectionComponent={RouteTraceSection} />
+            {/* Render the single trace section directly */}
+            {/* Use Paper for consistent look with other pages */}
+            <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+                <RouteInputForm trace={trace} />
+                <RouteVisualizer trace={trace} />
+            </Paper>
 
-       <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-            <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleAddRoute}
-                disabled={traces.length >= 5} // Optional limit
-            >
-                Add Route for Comparison
-            </Button>
-       </Box>
-    </Box>
-  );
+            {/* Remove the "Add Route for Comparison" button and surrounding Box */}
+
+        </Box>
+    );
 };
 
 export default RouteTracePage;

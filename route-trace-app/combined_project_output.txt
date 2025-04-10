@@ -18,8 +18,14 @@ route-trace-app/
 │   │   │   ├── HistoryItem.jsx
 │   │   │   └── HistoryList.jsx
 │   │   └── RouteTrace
+│   │       ├── DirectRouteTraceInputForm.jsx
+│   │       ├── DirectRouteTraceSection.jsx
+│   │       ├── DirectRouteVisualizer.jsx
 │   │       ├── HopDisplay.jsx
 │   │       ├── MacTraceDisplay.jsx
+│   │       ├── MacTraceInputForm.jsx
+│   │       ├── MacTraceSection.jsx
+│   │       ├── MacTraceVisualizer.jsx
 │   │       ├── RouteComparisonContainer.jsx
 │   │       ├── RouteInputForm.jsx
 │   │       ├── RouteTraceSection.jsx
@@ -28,8 +34,10 @@ route-trace-app/
 │   │   └── useAuth.js
 │   ├── pages
 │   │   ├── AllRoutesPage.jsx
+│   │   ├── DirectRouteTracePage.jsx
 │   │   ├── HistoryPage.jsx
 │   │   ├── LoginPage.jsx
+│   │   ├── MacTracePage.jsx
 │   │   ├── NotFoundPage.jsx
 │   │   └── RouteTracePage.jsx
 │   ├── services
@@ -39,7 +47,9 @@ route-trace-app/
 │   ├── store
 │   │   ├── slices
 │   │   │   ├── authSlice.js
+│   │   │   ├── directRouteSlice.js
 │   │   │   ├── historySlice.js
+│   │   │   ├── macTraceSlice.js
 │   │   │   └── routeTraceSlice.js
 │   │   └── store.js
 │   ├── utils
@@ -609,7 +619,9 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import LoginPage from './pages/LoginPage';
-import RouteTracePage from './pages/RouteTracePage';
+import RouteTracePage from './pages/RouteTracePage'; // Combined Trace
+import MacTracePage from './pages/MacTracePage'; // New MAC Trace
+import DirectRouteTracePage from './pages/DirectRouteTracePage'; // New Direct Route Trace
 import HistoryPage from './pages/HistoryPage';
 import AllRoutesPage from './pages/AllRoutesPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -662,7 +674,6 @@ function App() {
   );
 
   // Create the theme based on the current mode
-  // Use createTheme directly with the result of getDesignTokens
   const theme = useMemo(() => createTheme(getDesignTokens(mode)), [mode]);
 
   return (
@@ -686,13 +697,12 @@ function App() {
           component="main"
           sx={{
             flexGrow: 1,
-            // Add padding top to account for AppBar height only if AppBar is rendered
             pt: isAuthenticated ? `calc(${theme.mixins.toolbar.minHeight}px + ${theme.spacing(3)})` : theme.spacing(3),
             pb: 3, // Bottom padding
             px: 3, // Horizontal padding
-            width: isAuthenticated ? { md: `calc(100% - ${drawerWidth}px)` } : '100%', // Adjust width if drawer is present
-            ml: isAuthenticated ? { md: `${drawerWidth}px` } : 0, // Ensure content doesn't overlap with permanent drawer on desktop
-            transition: theme.transitions.create(['margin', 'width'], { // Smooth transition for sidebar appearance
+            width: isAuthenticated ? { md: `calc(100% - ${drawerWidth}px)` } : '100%',
+            ml: isAuthenticated ? { md: `${drawerWidth}px` } : 0,
+            transition: theme.transitions.create(['margin', 'width'], {
                  easing: theme.transitions.easing.sharp,
                  duration: theme.transitions.duration.leavingScreen,
             }),
@@ -702,11 +712,11 @@ function App() {
            {isAuthenticated && (
                 <AppBar
                     position="fixed"
-                    elevation={1} // Consistent with theme definition
+                    elevation={1}
                     sx={{
-                        width: { md: `calc(100% - ${drawerWidth}px)` }, // Only cover main content area on desktop
-                        ml: { md: `${drawerWidth}px` }, // Position correctly next to drawer on desktop
-                        display: { xs: 'block', md: 'none' } // Only show AppBar on mobile where sidebar is temporary
+                        width: { md: `calc(100% - ${drawerWidth}px)` },
+                        ml: { md: `${drawerWidth}px` },
+                        display: { xs: 'block', md: 'none' }
                     }}
                 >
                     <Toolbar>
@@ -715,28 +725,40 @@ function App() {
                             aria-label="open drawer"
                             edge="start"
                             onClick={handleDrawerToggle}
-                            sx={{ mr: 2, display: { md: 'none' } }} // Show only on mobile
+                            sx={{ mr: 2, display: { md: 'none' } }}
                         >
                             <MenuIcon />
                         </IconButton>
                         <Typography variant="h6" noWrap component="div">
-                            RouteTrace {/* You can make this dynamic based on page */}
+                            RouteTrace {/* Title can be dynamic */}
                         </Typography>
                     </Toolbar>
                 </AppBar>
             )}
 
-
-          {/* Container for centering and max-width (optional, adjust maxWidth as needed) */}
-          {/* Using Container might add extra padding, check if needed or just use the Box */}
-          {/* <Container maxWidth="xl"> */}
              <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route
-                    path="/"
+                    path="/" // Combined Trace (Original)
                     element={
                     <ProtectedRoute>
                         <RouteTracePage />
+                    </ProtectedRoute>
+                    }
+                />
+                 <Route
+                    path="/mac-trace" // New MAC Trace
+                    element={
+                    <ProtectedRoute>
+                        <MacTracePage />
+                    </ProtectedRoute>
+                    }
+                />
+                 <Route
+                    path="/direct-route-trace" // New Direct Route Trace
+                    element={
+                    <ProtectedRoute>
+                        <DirectRouteTracePage />
                     </ProtectedRoute>
                     }
                 />
@@ -752,14 +774,12 @@ function App() {
                     path="/all-routes"
                     element={
                     <ProtectedRoute>
-                        {/* Add role check here if needed in future */}
                         <AllRoutesPage />
                     </ProtectedRoute>
                     }
                 />
                 <Route path="*" element={<NotFoundPage />} />
              </Routes>
-          {/* </Container> */}
         </Box>
       </Box>
     </ThemeProvider>
@@ -1017,7 +1037,9 @@ import {
     Tooltip
 } from '@mui/material';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import RouteIcon from '@mui/icons-material/Route'; // For Trace Route
+import RouteIcon from '@mui/icons-material/Route'; // For Combined Trace Route
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // For MAC Trace
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck'; // For Direct Route Trace
 import HistoryIcon from '@mui/icons-material/History'; // For My History
 import PeopleIcon from '@mui/icons-material/People'; // For All Routes
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -1037,8 +1059,11 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
         navigate('/login'); // Redirect to login after logout
     };
 
+    // Updated Menu Items
     const menuItems = [
-        { text: 'Trace Route', icon: <RouteIcon />, path: '/' },
+        { text: 'Combined Trace', icon: <RouteIcon />, path: '/' },
+        { text: 'Direct Route Trace', icon: <NetworkCheckIcon />, path: '/direct-route-trace' },
+        { text: 'MAC Trace', icon: <SettingsEthernetIcon />, path: '/mac-trace' },
         { text: 'My History', icon: <HistoryIcon />, path: '/history' },
         { text: 'All Routes', icon: <PeopleIcon />, path: '/all-routes' },
     ];
@@ -1139,89 +1164,161 @@ export default Sidebar;
 
 // ----- File: src\components\History\HistoryItem.jsx -----
 
+// src/components/History/HistoryItem.jsx
 import React, { useState } from 'react';
-import { ListItem, ListItemText, Collapse, IconButton, Typography, Box, Paper, Stack, Chip } from '@mui/material';
+import {
+    ListItem,
+    ListItemText,
+    Collapse,
+    IconButton,
+    Typography,
+    Box,
+    Paper,
+    Stack,
+    Chip,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails,
+    Divider
+} from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
-import HopDisplay from '../RouteTrace/HopDisplay'; // Reuse HopDisplay
+import DeviceUnknownIcon from '@mui/icons-material/DeviceUnknown';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import HopDisplay from '../RouteTrace/HopDisplay';
 import { formatTimestamp } from '../../utils/formatters';
+
 
 const HistoryItem = ({ route }) => {
   const [open, setOpen] = useState(false);
-  const { id, source, destination, timestamp, routeData, deviceInfo, user } = route; // Assuming 'user' field available in 'all routes'
+  const { id, source, destination, timestamp, routeData, deviceInfo, user } = route;
 
   const handleClick = () => {
     setOpen(!open);
   };
 
-  // Basic check if routeData looks like a valid trace array
-  const hasValidRouteData = Array.isArray(routeData) && routeData.length > 0 && typeof routeData[0] === 'object';
+  const hasValidRouteData = Array.isArray(routeData) && routeData.length > 0;
 
   return (
     <>
+      {/* Main List Item Header */}
       <ListItem button onClick={handleClick} divider>
         <ListItemText
           primary={
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body1">
-                      <Chip label="Src" size="small" color="primary" sx={{ mr: 1}} />{source || 'N/A'}
+              <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1}>
+                  <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
+                      <Chip label="Src" size="small" color="primary" sx={{ mr: 0.5}} />
+                      <Typography component="span" sx={{wordBreak: 'break-all'}}>{source || 'N/A'}</Typography>
                       <Typography component="span" sx={{ mx: 1 }}>→</Typography>
-                      <Chip label="Dst" size="small" color="secondary" sx={{ mr: 1}} />{destination || 'N/A'}
+                      <Chip label="Dst" size="small" color="secondary" sx={{ mr: 0.5}} />
+                      <Typography component="span" sx={{wordBreak: 'break-all'}}>{destination || 'N/A'}</Typography>
                   </Typography>
-                  {user && <Typography variant="caption" color="text.secondary">User: {user.username}</Typography>}
+                  <Stack direction="column" alignItems={{ xs: 'flex-start', sm: 'flex-end' }} sx={{ minWidth: '150px' }}>
+                     {user && <Typography variant="caption" color="text.secondary">User: {user.username}</Typography>}
+                     <Typography variant="caption" color="text.secondary">{formatTimestamp(timestamp)}</Typography>
+                     <Typography variant="caption" color="text.secondary" sx={{fontSize: '0.65rem'}}>(ID: {id})</Typography>
+                  </Stack>
              </Stack>
             }
-          secondary={`Traced on: ${formatTimestamp(timestamp)} (ID: ${id})`}
         />
         {hasValidRouteData ? (open ? <ExpandLess /> : <ExpandMore />) : null }
       </ListItem>
-      {hasValidRouteData && (
-          <Collapse in={open} timeout="auto" unmountOnExit>
-            <Paper sx={{ p: 2, m: 1, bgcolor: 'grey.50' }}>
-                <Typography variant="h6" gutterBottom>Detailed Route</Typography>
-                {deviceInfo && (
-                    <Box mb={2}>
-                        <Typography variant="subtitle2">Device Info:</Typography>
-                        <pre style={{fontSize: '0.8rem', background: '#eee', padding: '5px', borderRadius: '4px', overflowX: 'auto'}}>{JSON.stringify(deviceInfo, null, 2)}</pre>
-                    </Box>
-                )}
-                <Stack
-                  direction="row"
-                  spacing={0}
-                  alignItems="flex-start"
-                  sx={{
-                    overflowX: 'auto', // Enable horizontal scrolling
-                    py: 2,
-                    px: 1,
-                    borderTop: '1px dashed',
-                    borderColor: 'divider',
-                  }}
-                >
-                 {routeData.map((hop, index) => (
-                    <HopDisplay
-                        key={hop.hop || index}
-                        hopData={hop}
-                        isFirst={index === 0}
-                        isLast={index === routeData.length - 1}
-                    />
-                 ))}
-                </Stack>
-            </Paper>
-          </Collapse>
-      )}
-      {!hasValidRouteData && open && (
-           <Collapse in={open} timeout="auto" unmountOnExit>
-                <Paper sx={{ p: 2, m: 1, bgcolor: 'grey.50' }}>
-                    <Typography color="text.secondary">No detailed route hops available for this entry.</Typography>
-                     {routeData && <pre style={{fontSize: '0.8rem', background: '#eee', padding: '5px', borderRadius: '4px', overflowX: 'auto'}}>{JSON.stringify(routeData, null, 2)}</pre>}
-                </Paper>
-           </Collapse>
-      )}
+
+      {/* Collapsible Details Section */}
+      <Collapse in={open} timeout="auto" unmountOnExit>
+        <Paper sx={{ p: 0, m: 1, bgcolor: 'background.default' }} elevation={0}>
+
+            {/* Device Info Accordion (if available) */}
+            {deviceInfo && typeof deviceInfo === 'object' && Object.keys(deviceInfo).length > 0 && (
+                 <Accordion elevation={1} sx={{mb: 1}}>
+                     <AccordionSummary
+                        expandIcon={<ExpandMore />}
+                        aria-controls={`panel-deviceinfo-${id}-content`}
+                        id={`panel-deviceinfo-${id}-header`}
+                     >
+                         <DeviceUnknownIcon sx={{mr: 1, color: 'action.active'}}/>
+                         <Typography variant="subtitle2">Additional Device Info</Typography>
+                     </AccordionSummary>
+                     <AccordionDetails sx={{bgcolor: 'grey.100', p: 1}}>
+                         <pre style={{fontSize: '0.8rem', margin: 0, padding: '5px', borderRadius: '4px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>
+                             {JSON.stringify(deviceInfo, null, 2)}
+                         </pre>
+                     </AccordionDetails>
+                 </Accordion>
+            )}
+
+            {/* Route Trace Accordion */}
+            {hasValidRouteData && (
+                <Accordion defaultExpanded elevation={1}>
+                     <AccordionSummary
+                        expandIcon={<ExpandMore />}
+                        aria-controls={`panel-routedata-${id}-content`}
+                        id={`panel-routedata-${id}-header`}
+                     >
+                         <AccountTreeIcon sx={{mr: 1, color: 'action.active'}} />
+                         <Typography variant="subtitle2">Detailed Route Hops ({routeData.length})</Typography>
+                     </AccordionSummary>
+                     <AccordionDetails sx={{ p: 1 }}>
+                         <Stack
+                             direction="row"
+                             spacing={0}
+                             alignItems="center"
+                             sx={{
+                                 overflowX: 'auto',
+                                 minWidth: 0,         // <<<--- ADDED THIS LINE
+                                 maxWidth: '70vw',    // <<<--- ADDED THIS LINE
+                                 py: 1,
+                                 px: 1,
+                                 border: '1px dashed',
+                                 borderColor: 'divider',
+                                 borderRadius: 1,
+                                 minHeight: '90px',
+                                 // Optional: Center the stack if content is narrower than maxWidth
+                                 // marginX: 'auto',
+                             }}
+                         >
+                             {routeData.map((hop, index) => (
+                                 <HopDisplay
+                                     key={`${hop.device_id || hop.ip}-${hop.hop}-${index}`}
+                                     hopData={hop}
+                                     isFirst={index === 0}
+                                     isLast={index === routeData.length - 1}
+                                 />
+                             ))}
+                         </Stack>
+                    </AccordionDetails>
+                </Accordion>
+            )}
+
+            {/* Message if no valid route data */}
+            {!hasValidRouteData && (
+                 <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
+                    No detailed route hops available for this history entry.
+                 </Typography>
+            )}
+
+             {typeof route.route === 'string' && (!Array.isArray(routeData) || routeData.length === 0) && (
+                  <Accordion elevation={1} sx={{mt: 1}}>
+                    <AccordionSummary expandIcon={<ExpandMore />} aria-controls={`panel-raw-${id}-content`} id={`panel-raw-${id}-header`}>
+                        <Typography variant="caption">Raw Route Data (Parsing Failed or Empty)</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{bgcolor: 'grey.100', p: 1}}>
+                        <pre style={{fontSize: '0.8rem', margin: 0, padding: '5px', borderRadius: '4px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>
+                            {route.route}
+                        </pre>
+                    </AccordionDetails>
+                  </Accordion>
+             )}
+        </Paper>
+      </Collapse>
     </>
   );
 };
 
+
 export default HistoryItem;
+
+// ----- End File: src/components/History/HistoryItem.jsx -----
 
 // ----- End File: src\components\History\HistoryItem.jsx -----
 
@@ -1252,26 +1349,526 @@ export default HistoryList;
 
 // ----- End File: src\components\History\HistoryList.jsx -----
 
-// ----- File: src\components\RouteTrace\HopDisplay.jsx -----
+// ----- File: src\components\RouteTrace\DirectRouteTraceInputForm.jsx -----
+
+// ----- File: src/components/RouteTrace/DirectRouteTraceInputForm.jsx -----
 
 import React from 'react';
-import { Paper, Typography, Box, Chip } from '@mui/material';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import { useDispatch } from 'react-redux';
+import { TextField, Button, Box, Grid, CircularProgress, Tooltip, IconButton } from '@mui/material';
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
+import SyncIcon from '@mui/icons-material/Sync';
+import SyncProblemIcon from '@mui/icons-material/SyncProblem';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import EditIcon from '@mui/icons-material/Edit';
+import { updateDirectTraceInput, fetchDirectDefaultGateway, performDirectRouteTrace } from '../../store/slices/directRouteSlice'; // Use directRouteSlice actions
+import ErrorMessage from '../Common/ErrorMessage';
 
-const HopDisplay = ({ hopData, isFirst, isLast }) => {
-  // Assuming hopData structure like { hop: number, ip: string, name: string, type: string }
-  // Type might indicate firewall, router etc. - adjust as needed based on backend output
-  const { hop, ip, name, type } = hopData;
+const DirectRouteTraceInputForm = ({ trace }) => {
+  const dispatch = useDispatch();
+  const {
+    id: traceId,
+    sourceIp, destinationIp, sourceDg, destinationDg, vrf, // Added VRF
+    sourceDgStatus, destinationDgStatus, traceStatus, error
+  } = trace;
+
+  const handleInputChange = (field) => (event) => {
+    dispatch(updateDirectTraceInput({ traceId, field, value: event.target.value }));
+  };
+
+  const handleFetchDg = (type) => () => {
+    const ip = type === 'source' ? sourceIp : destinationIp;
+    if (ip) {
+      // Pass traceId and type
+      dispatch(fetchDirectDefaultGateway({ ip, type, traceId }));
+    }
+  };
+
+  const handleTrace = () => {
+    dispatch(performDirectRouteTrace({ traceId, sourceIp, destinationIp, sourceDg, destinationDg, vrf }));
+  };
+
+  const isFetchingSourceDg = sourceDgStatus === 'loading';
+  const isFetchingDestDg = destinationDgStatus === 'loading';
+  const isTracing = traceStatus === 'loading';
+
+  const sourceDgDisabled = isFetchingSourceDg;
+  const destDgDisabled = isFetchingDestDg;
+
+  const renderDgStatusIcon = (status) => {
+    switch (status) {
+      case 'loading':
+        return <CircularProgress size={20} />;
+      case 'succeeded':
+        return <Tooltip title="Gateway Fetched"><CheckCircleIcon color="success" /></Tooltip>;
+      case 'failed':
+        return <Tooltip title="Failed to Fetch Gateway"><SyncProblemIcon color="error" /></Tooltip>;
+      case 'manual':
+         return <Tooltip title="Manually Entered"><EditIcon color="action" /></Tooltip>;
+      default: // idle
+        return null;
+    }
+  };
+
+  const dgError = error && (sourceDgStatus === 'failed' || destinationDgStatus === 'failed');
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-       {!isFirst && <ArrowForwardIcon sx={{ mx: 1, color: 'text.secondary' }} />}
-      <Paper elevation={2} sx={{ p: 1.5, minWidth: 150, textAlign: 'center' }}>
-          <Typography variant="caption" display="block" gutterBottom>Hop {hop}</Typography>
-          <Typography variant="body1" sx={{ fontWeight: 'bold' }}>{ip || 'N/A'}</Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>{name || 'Unknown Host'}</Typography>
-          {type && <Chip label={type} size="small" sx={{ mt: 1 }} />}
+    <Box sx={{ mb: 3 }}>
+        {dgError && <ErrorMessage error={error} title="Gateway Fetch Error" />}
+        <Grid container spacing={2} alignItems="flex-start">
+            {/* Source IP */}
+            <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                    label="Source IP"
+                    value={sourceIp}
+                    onChange={handleInputChange('sourceIp')}
+                    onBlur={handleFetchDg('source')}
+                    variant="outlined"
+                    fullWidth
+                    required
+                    disabled={isTracing}
+                />
+            </Grid>
+
+             {/* Source DG */}
+            <Grid item xs={10} sm={5} md={2}>
+                 <TextField
+                    label="Source DG"
+                    value={sourceDg}
+                    onChange={handleInputChange('sourceDg')}
+                    variant="outlined"
+                    fullWidth
+                    required
+                    disabled={sourceDgDisabled || isTracing}
+                    InputProps={{ endAdornment: renderDgStatusIcon(sourceDgStatus) }}
+                 />
+            </Grid>
+            <Grid item xs={2} sm={1} md={1} sx={{display: 'flex', alignItems: 'center', height: '56px' }}>
+                 <Tooltip title="Re-fetch Source Gateway">
+                     <span>
+                        <IconButton onClick={handleFetchDg('source')} disabled={!sourceIp || isFetchingSourceDg || isTracing} size="small"> <SyncIcon /> </IconButton>
+                     </span>
+                 </Tooltip>
+            </Grid>
+
+            {/* Destination IP */}
+            <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                    label="Destination IP"
+                    value={destinationIp}
+                    onChange={handleInputChange('destinationIp')}
+                    onBlur={handleFetchDg('destination')}
+                    variant="outlined"
+                    fullWidth
+                    required
+                    disabled={isTracing}
+                 />
+            </Grid>
+
+             {/* Destination DG */}
+            <Grid item xs={10} sm={5} md={2}>
+                 <TextField
+                    label="Destination DG"
+                    value={destinationDg}
+                    onChange={handleInputChange('destinationDg')}
+                    variant="outlined"
+                    fullWidth
+                    required
+                    disabled={destDgDisabled || isTracing}
+                    InputProps={{ endAdornment: renderDgStatusIcon(destinationDgStatus) }}
+                />
+            </Grid>
+             <Grid item xs={2} sm={1} md={1} sx={{display: 'flex', alignItems: 'center', height: '56px'}}>
+                 <Tooltip title="Re-fetch Destination Gateway">
+                     <span>
+                        <IconButton onClick={handleFetchDg('destination')} disabled={!destinationIp || isFetchingDestDg || isTracing} size="small"> <SyncIcon /> </IconButton>
+                     </span>
+                 </Tooltip>
+            </Grid>
+
+            {/* VRF Input */}
+             <Grid item xs={12} sm={6} md={3}>
+                <TextField
+                    label="VRF (Optional)"
+                    value={vrf || ''} // Ensure controlled component
+                    onChange={handleInputChange('vrf')}
+                    variant="outlined"
+                    fullWidth
+                    disabled={isTracing}
+                    helperText="Specify VRF context if applicable"
+                 />
+            </Grid>
+
+        </Grid>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+            <Button
+                variant="contained"
+                color="primary"
+                size="large"
+                startIcon={isTracing ? <CircularProgress size={20} color="inherit" /> : <NetworkCheckIcon />}
+                onClick={handleTrace}
+                disabled={!sourceIp || !destinationIp || !sourceDg || !destinationDg || isTracing || isFetchingSourceDg || isFetchingDestDg}
+            >
+                {isTracing ? 'Tracing...' : 'Trace Direct Route'}
+            </Button>
+        </Box>
+    </Box>
+  );
+};
+
+export default DirectRouteTraceInputForm;
+
+// ----- End File: src/components/RouteTrace/DirectRouteTraceInputForm.jsx -----
+
+// ----- End File: src\components\RouteTrace\DirectRouteTraceInputForm.jsx -----
+
+// ----- File: src\components\RouteTrace\DirectRouteTraceSection.jsx -----
+
+// ----- File: src/components/RouteTrace/DirectRouteTraceSection.jsx -----
+
+import React from 'react';
+import { Paper, Box, IconButton, Tooltip } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import DirectRouteTraceInputForm from './DirectRouteTraceInputForm';
+import DirectRouteVisualizer from './DirectRouteVisualizer';
+import { useDispatch } from 'react-redux';
+import { removeDirectTraceSection } from '../../store/slices/directRouteSlice'; // Use correct slice action
+
+const DirectRouteTraceSection = ({ trace, canRemove }) => {
+  const dispatch = useDispatch();
+
+  const handleRemove = () => {
+      if (canRemove) {
+          dispatch(removeDirectTraceSection(trace.id));
+      }
+  }
+
+  return (
+    <Paper elevation={2} sx={{ p: 2, mb: 3, position: 'relative' }}>
+        {canRemove && (
+            <Tooltip title="Remove this trace section">
+                <IconButton
+                    onClick={handleRemove}
+                    size="small"
+                    sx={{ position: 'absolute', top: 8, right: 8 }}
+                >
+                    <CloseIcon />
+                </IconButton>
+            </Tooltip>
+        )}
+        <DirectRouteTraceInputForm trace={trace} />
+        <DirectRouteVisualizer trace={trace} />
+    </Paper>
+  );
+};
+
+export default DirectRouteTraceSection;
+
+// ----- End File: src/components/RouteTrace/DirectRouteTraceSection.jsx -----
+
+// ----- End File: src\components\RouteTrace\DirectRouteTraceSection.jsx -----
+
+// ----- File: src\components\RouteTrace\DirectRouteVisualizer.jsx -----
+
+// ----- File: src/components/RouteTrace/DirectRouteVisualizer.jsx -----
+
+import React from 'react';
+import { Box, Typography, Stack, Paper } from '@mui/material';
+import LoadingSpinner from '../Common/LoadingSpinner';
+import ErrorMessage from '../Common/ErrorMessage';
+import HopDisplay from './HopDisplay';
+
+const DirectRouteVisualizer = ({ trace }) => {
+  const {
+    sourceIp, destinationIp, sourceDg, destinationDg, vrf,
+    traceResult,
+    traceStatus,
+    error
+  } = trace;
+
+  if (traceStatus === 'loading') {
+    return <LoadingSpinner />;
+  }
+
+  const displayError = error && traceStatus === 'failed';
+
+  return (
+    <Paper elevation={0} sx={{ mt: 3, p: { xs: 1, sm: 2 }, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+      <Typography variant="h6" gutterBottom align="center">Direct Route Trace Results</Typography>
+       {vrf && <Typography variant="caption" display="block" align="center" color="text.secondary" gutterBottom>VRF Context: {vrf}</Typography>}
+
+
+      {displayError && <ErrorMessage error={error} title="Direct Route Trace Error" />}
+
+      {(traceStatus === 'succeeded' || traceStatus === 'failed') && !displayError && (
+        <Box>
+          {/* Simple Header: Source IP/DG -> Dest IP/DG */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+              <Paper elevation={1} sx={{ p: 1, textAlign: 'center', flexGrow: 1 }}>
+                  <Typography variant="overline" sx={{lineHeight: 1.2}}>Source</Typography>
+                  <Typography variant="body2" sx={{wordBreak: 'break-all'}}>{sourceIp}</Typography>
+                  <Typography variant="caption" sx={{wordBreak: 'break-all'}}>DG: {sourceDg}</Typography>
+              </Paper>
+              <Typography variant="h5">→</Typography>
+              <Paper elevation={1} sx={{ p: 1, textAlign: 'center', flexGrow: 1 }}>
+                  <Typography variant="overline" sx={{lineHeight: 1.2}}>Destination</Typography>
+                  <Typography variant="body2" sx={{wordBreak: 'break-all'}}>{destinationIp}</Typography>
+                  <Typography variant="caption" sx={{wordBreak: 'break-all'}}>DG: {destinationDg}</Typography>
+              </Paper>
+          </Box>
+
+          {/* Display Hops */}
+          {traceResult && traceResult.length > 0 ? (
+            <Stack
+              direction="row"
+              spacing={0}
+              alignItems="center"
+              sx={{
+                overflowX: 'auto',
+                minWidth: 0,
+                maxWidth: '70vw', // <<<--- ADDED THIS LINE
+                py: 2,
+                px: 1,
+                borderTop: '1px dashed',
+                borderBottom: '1px dashed',
+                borderColor: 'divider',
+                my: 2,
+                minHeight: '100px',
+                 // Optional: Center the stack if content is narrower than maxWidth
+                // marginX: 'auto',
+              }}
+            >
+              {traceResult.map((hop, index) => (
+                <HopDisplay
+                  key={`${hop.device_id || hop.ip}-${hop.hop}-${index}`}
+                  hopData={hop}
+                  isFirst={index === 0}
+                  isLast={index === traceResult.length - 1}
+                />
+              ))}
+            </Stack>
+          ) : (
+             traceStatus === 'succeeded' && (!traceResult || traceResult.length === 0) && (
+                <Typography align="center" color="text.secondary" sx={{ my: 3 }}>
+                    No route trace hops returned between the specified points.
+                </Typography>
+             )
+          )}
+        </Box>
+      )}
+
+      {/* Initial state message */}
+      {traceStatus === 'idle' && !error && (
+        <Typography align="center" color="text.secondary">Enter details and click 'Trace Direct Route' to see results.</Typography>
+      )}
+    </Paper>
+  );
+};
+
+export default DirectRouteVisualizer;
+
+// ----- End File: src/components/RouteTrace/DirectRouteVisualizer.jsx -----
+
+// ----- End File: src\components\RouteTrace\DirectRouteVisualizer.jsx -----
+
+// ----- File: src\components\RouteTrace\HopDisplay.jsx -----
+
+// src/components/RouteTrace/HopDisplay.jsx
+import React, { useState } from 'react';
+import {
+    Paper,
+    Typography,
+    Box,
+    Chip,
+    IconButton,
+    Popover,
+    List,
+    ListItem,
+    ListItemText,
+    Divider,
+    Tooltip
+} from '@mui/material';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+
+// Helper to format keys for display
+const formatDetailKey = (key) => {
+  return key
+    .replace(/_/g, ' ') // Replace underscores with spaces
+    .replace(/([A-Z])/g, ' $1') // Add space before capitals (for camelCase)
+    .replace(/^./, (str) => str.toUpperCase()); // Capitalize first letter
+};
+
+const HopDisplay = ({ hopData, isFirst, isLast }) => {
+  const [anchorEl, setAnchorEl] = useState(null);
+
+  const handlePopoverOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handlePopoverClose = () => {
+    setAnchorEl(null);
+  };
+
+  const open = Boolean(anchorEl);
+  const id = open ? `hop-popover-${hopData.hop}-${hopData.ip}` : undefined;
+
+  // --- Extract Data ---
+  // Destructure all potential fields from the DetailedHop model
+  const {
+    hop,
+    ip,
+    type,
+    hostname,
+    destination_network,
+    vrf,
+    destination_dg_ip,
+    mpls_label,
+    passed_firewall,
+    device_id, // Note: comes from 'id_' alias in backend model
+    destination_mac,
+    next_hop_interface,
+    nexthop_int_ip,
+    ...otherDetails // Collect any unexpected extra fields
+  } = hopData;
+
+  // --- Prepare Details for Popover ---
+  // Filter out null/undefined and primary display fields
+  const detailsToShow = Object.entries({
+    hostname, // Show hostname again in details if it exists
+    destination_network,
+    vrf,
+    destination_dg_ip,
+    mpls_label,
+    passed_firewall,
+    device_id,
+    destination_mac,
+    next_hop_interface,
+    nexthop_int_ip,
+    ...otherDetails
+  }).filter(([key, value]) => value !== null && value !== undefined && value !== '');
+
+  // Determine primary display text (Hostname if available, otherwise IP/MAC)
+  const primaryDisplay = hostname || ip || 'N/A';
+  const secondaryDisplay = hostname && ip ? ip : (type || 'Unknown Type'); // Show IP/MAC if hostname is primary, else show Type
+
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+      {!isFirst && <ArrowForwardIcon sx={{ mx: 0.5, color: 'text.secondary', fontSize: '1.2rem' }} />}
+      <Paper
+        elevation={2}
+        sx={{
+          p: 1, // Reduced padding slightly
+          minWidth: 160, // Slightly wider min-width
+          textAlign: 'center',
+          position: 'relative', // Needed for absolute positioning of button
+          mr: 0.5, // Margin between paper and next arrow
+        }}
+      >
+        {/* Hop Number Chip */}
+        <Chip label={`Hop ${hop}`} size="small" variant="outlined" sx={{ mb: 0.5 }} />
+
+        {/* Primary Display (Hostname or IP/MAC) */}
+        <Typography
+          variant="body1"
+          sx={{
+            fontWeight: 'bold',
+            wordBreak: 'break-all', // Break long hostnames/IPs
+            lineHeight: 1.2,
+            mb: 0.2,
+          }}
+        >
+          {primaryDisplay}
+        </Typography>
+
+        {/* Secondary Display (IP/MAC or Type) */}
+        <Typography
+          variant="caption" // Smaller font for secondary info
+          sx={{
+            color: 'text.secondary',
+            display: 'block',
+            wordBreak: 'break-all',
+            lineHeight: 1.1,
+          }}
+        >
+          {secondaryDisplay}
+        </Typography>
+
+         {/* Chip for Type if not already shown */}
+         {type && secondaryDisplay !== type && (
+             <Chip label={type} size="small" sx={{ mt: 0.5, fontSize: '0.65rem', height: '18px' }} />
+         )}
+
+
+        {/* Details Button */}
+        {detailsToShow.length > 0 && (
+          <Tooltip title="Show Details">
+            <IconButton
+              aria-label="show details"
+              size="small"
+              onClick={handlePopoverOpen}
+              aria-describedby={id}
+              sx={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                p: '2px', // Small padding
+              }}
+            >
+              <InfoOutlinedIcon fontSize="inherit" sx={{ fontSize: '1rem' }} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Paper>
+
+      {/* Popover for Details */}
+      <Popover
+        id={id}
+        open={open}
+        anchorEl={anchorEl}
+        onClose={handlePopoverClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'center',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'center',
+        }}
+        slotProps={{ // Use slotProps for Paper styling
+             paper: {
+                sx: { maxWidth: 350, p: 0 } // Padding handled by ListItems
+             }
+        }}
+      >
+        <Box sx={{ p: 1 }}>
+            <Typography variant="subtitle2" sx={{ px: 2, pt: 1, pb: 0.5 }}>Hop {hop} Details</Typography>
+            <Divider />
+            <List dense disablePadding>
+            {detailsToShow.map(([key, value]) => (
+                <ListItem key={key} dense divider sx={{py: 0.5}}>
+                    <ListItemText
+                        primary={formatDetailKey(key)}
+                        secondary={
+                            // Handle boolean display
+                            typeof value === 'boolean' ? (value ? 'Yes' : 'No') :
+                            // Handle potentially long strings
+                            (typeof value === 'string' && value.length > 50 ? `${value.substring(0, 50)}...` : value)
+                        }
+                        primaryTypographyProps={{ variant: 'caption', fontWeight: 'medium' }}
+                        secondaryTypographyProps={{ variant: 'caption', color: 'text.primary', sx: { whiteSpace: 'pre-wrap', wordBreak: 'break-all' } }}
+                        sx={{ my: 0 }}
+                     />
+                </ListItem>
+            ))}
+             {detailsToShow.length === 0 && (
+                 <ListItem dense>
+                     <ListItemText secondary="No additional details available." secondaryTypographyProps={{ variant: 'caption' }} />
+                 </ListItem>
+             )}
+            </List>
+        </Box>
+      </Popover>
     </Box>
   );
 };
@@ -1282,20 +1879,21 @@ export default HopDisplay;
 
 // ----- File: src\components\RouteTrace\MacTraceDisplay.jsx -----
 
-// ----- File: src/components/RouteTrace/MacTraceDisplay.jsx -----
+// src/components/RouteTrace/MacTraceDisplay.jsx
+// No changes needed - it passes the detailed hops to HopDisplay
 
 import React from 'react';
 import { Paper, Typography, Box, Stack } from '@mui/material';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import ErrorMessage from '../Common/ErrorMessage';
-import HopDisplay from './HopDisplay'; // Reuse HopDisplay
+import HopDisplay from './HopDisplay'; // HopDisplay now handles details
 
 const MacTraceDisplay = ({ label, hops, isLoading, error }) => {
-  // hops is now expected to be an array like [{hop: 1, ip: 'mac/ip', name: 'dev', type: 'L2/L3'}, ...] or null/undefined
+  // hops is now an array of DetailedHop objects
 
   return (
-    <Paper elevation={1} sx={{ p: 2, my: 1, bgcolor: 'grey.100' }}>
+    <Paper elevation={0} sx={{ p: 1, my: 1, bgcolor: 'action.hover' }}> {/* Slightly different bg */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}>
         <CompareArrowsIcon fontSize="small" color="action" />
         <Typography variant="overline">{label}</Typography>
@@ -1313,18 +1911,21 @@ const MacTraceDisplay = ({ label, hops, isLoading, error }) => {
           ) : (
             <Stack
               direction="row"
-              spacing={0} // Let HopDisplay handle spacing
-              alignItems="flex-start"
+              spacing={0} // Spacing handled by arrows in HopDisplay
+              alignItems="center" // Center items vertically
               sx={{
                 overflowX: 'auto', // Enable horizontal scrolling
+                minWidth: 0, // <<<--- ADD THIS LINE TO PREVENT STACK FROM OVER-EXPANDING
                 py: 1,
                 px: 1,
+                minHeight: '70px', // Ensure minimum height even with few hops
               }}
             >
               {hops.map((hop, index) => (
                 <HopDisplay
-                  key={hop.hop || index} // Use hop number or index as key
-                  hopData={hop}
+                  // Use a more robust key if available (e.g., device_id + hop)
+                  key={`${hop.device_id || hop.ip}-${hop.hop}-${index}`}
+                  hopData={hop} // Pass the full detailed hop object
                   isFirst={index === 0}
                   isLast={index === hops.length - 1}
                 />
@@ -1343,15 +1944,287 @@ export default MacTraceDisplay;
 
 // ----- End File: src\components\RouteTrace\MacTraceDisplay.jsx -----
 
-// ----- File: src\components\RouteTrace\RouteComparisonContainer.jsx -----
+// ----- File: src\components\RouteTrace\MacTraceInputForm.jsx -----
+
+// ----- File: src/components/RouteTrace/MacTraceInputForm.jsx -----
 
 import React from 'react';
-import { useSelector } from 'react-redux';
-import { Box, Grid } from '@mui/material';
-import RouteTraceSection from './RouteTraceSection';
+import { useDispatch } from 'react-redux';
+import { TextField, Button, Box, Grid, CircularProgress, Tooltip, IconButton } from '@mui/material';
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet';
+import SyncIcon from '@mui/icons-material/Sync';
+import SyncProblemIcon from '@mui/icons-material/SyncProblem';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import EditIcon from '@mui/icons-material/Edit';
+import { updateMacTraceInput, fetchMacDefaultGateway, performMacTrace } from '../../store/slices/macTraceSlice'; // Use macTraceSlice actions
+import ErrorMessage from '../Common/ErrorMessage';
 
-const RouteComparisonContainer = () => {
-  const traces = useSelector((state) => state.routeTrace.traces);
+const MacTraceInputForm = ({ trace }) => {
+  const dispatch = useDispatch();
+  const {
+    id: traceId,
+    ip, // MAC trace needs IP and DG
+    dg,
+    dgStatus, // Only one DG status needed
+    traceStatus,
+    error
+  } = trace;
+
+  const handleInputChange = (field) => (event) => {
+    dispatch(updateMacTraceInput({ traceId, field, value: event.target.value }));
+  };
+
+  const handleFetchDg = () => {
+    if (ip) {
+      // Pass traceId for linking state updates
+      dispatch(fetchMacDefaultGateway({ ip, traceId }));
+    }
+  };
+
+  const handleTrace = () => {
+    dispatch(performMacTrace({ traceId, ip, dg }));
+  };
+
+  const isFetchingDg = dgStatus === 'loading';
+  const isTracing = traceStatus === 'loading';
+  const dgDisabled = isFetchingDg;
+
+  const renderDgStatusIcon = (status) => {
+    switch (status) {
+      case 'loading':
+        return <CircularProgress size={20} />;
+      case 'succeeded':
+        return <Tooltip title="Gateway Fetched"><CheckCircleIcon color="success" /></Tooltip>;
+      case 'failed':
+        return <Tooltip title="Failed to Fetch Gateway"><SyncProblemIcon color="error" /></Tooltip>;
+      case 'manual':
+         return <Tooltip title="Manually Entered"><EditIcon color="action" /></Tooltip>;
+      default: // idle
+        return null;
+    }
+  };
+
+  const dgError = error && dgStatus === 'failed';
+
+  return (
+    <Box sx={{ mb: 3 }}>
+        {dgError && <ErrorMessage error={error} title="Gateway Fetch Error" />}
+        <Grid container spacing={2} alignItems="flex-start">
+            {/* Endpoint IP */}
+            <Grid item xs={12} sm={6}>
+                <TextField
+                    label="Endpoint IP"
+                    value={ip}
+                    onChange={handleInputChange('ip')}
+                    onBlur={handleFetchDg} // Trigger fetch on blur
+                    variant="outlined"
+                    fullWidth
+                    required
+                    disabled={isTracing}
+                />
+            </Grid>
+
+             {/* Default Gateway (DG) */}
+            <Grid item xs={10} sm={5}>
+                 <TextField
+                    label="Endpoint Default Gateway"
+                    value={dg}
+                    onChange={handleInputChange('dg')}
+                    variant="outlined"
+                    fullWidth
+                    required
+                    disabled={dgDisabled || isTracing}
+                    InputProps={{
+                        endAdornment: renderDgStatusIcon(dgStatus),
+                    }}
+                 />
+            </Grid>
+            <Grid item xs={2} sm={1} sx={{display: 'flex', alignItems: 'center', height: '56px' }}>
+                 <Tooltip title="Re-fetch Gateway">
+                     <span>
+                        <IconButton onClick={handleFetchDg} disabled={!ip || isFetchingDg || isTracing} size="small">
+                            <SyncIcon />
+                        </IconButton>
+                     </span>
+                 </Tooltip>
+            </Grid>
+        </Grid>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+            <Button
+                variant="contained"
+                color="primary"
+                size="large"
+                startIcon={isTracing ? <CircularProgress size={20} color="inherit" /> : <SettingsEthernetIcon />}
+                onClick={handleTrace}
+                disabled={!ip || !dg || isTracing || isFetchingDg}
+            >
+                {isTracing ? 'Tracing...' : 'Trace MAC Path'}
+            </Button>
+        </Box>
+    </Box>
+  );
+};
+
+export default MacTraceInputForm;
+
+// ----- End File: src/components/RouteTrace/MacTraceInputForm.jsx -----
+
+// ----- End File: src\components\RouteTrace\MacTraceInputForm.jsx -----
+
+// ----- File: src\components\RouteTrace\MacTraceSection.jsx -----
+
+// ----- File: src/components/RouteTrace/MacTraceSection.jsx -----
+
+import React from 'react';
+import { Paper, Box, IconButton, Tooltip } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import MacTraceInputForm from './MacTraceInputForm';
+import MacTraceVisualizer from './MacTraceVisualizer';
+import { useDispatch } from 'react-redux';
+import { removeMacTraceSection } from '../../store/slices/macTraceSlice'; // Use correct slice action
+
+const MacTraceSection = ({ trace, canRemove }) => {
+  const dispatch = useDispatch();
+
+  const handleRemove = () => {
+      if (canRemove) {
+          dispatch(removeMacTraceSection(trace.id));
+      }
+  }
+
+  return (
+    <Paper elevation={2} sx={{ p: 2, mb: 3, position: 'relative' }}>
+        {canRemove && (
+            <Tooltip title="Remove this trace section">
+                <IconButton
+                    onClick={handleRemove}
+                    size="small"
+                    sx={{ position: 'absolute', top: 8, right: 8 }}
+                >
+                    <CloseIcon />
+                </IconButton>
+            </Tooltip>
+        )}
+        <MacTraceInputForm trace={trace} />
+        <MacTraceVisualizer trace={trace} />
+    </Paper>
+  );
+};
+
+export default MacTraceSection;
+
+// ----- End File: src/components/RouteTrace/MacTraceSection.jsx -----
+
+// ----- End File: src\components\RouteTrace\MacTraceSection.jsx -----
+
+// ----- File: src\components\RouteTrace\MacTraceVisualizer.jsx -----
+
+// ----- File: src/components/RouteTrace/MacTraceVisualizer.jsx -----
+
+import React from 'react';
+import { Box, Typography, Stack, Paper } from '@mui/material';
+import LoadingSpinner from '../Common/LoadingSpinner';
+import ErrorMessage from '../Common/ErrorMessage';
+import HopDisplay from './HopDisplay'; // Reuse HopDisplay
+
+const MacTraceVisualizer = ({ trace }) => {
+  const {
+    ip, // Source IP
+    dg, // Destination Gateway
+    traceResult, // Renamed from macTrace in slice to avoid confusion
+    traceStatus,
+    error
+  } = trace;
+
+  if (traceStatus === 'loading') {
+    return <LoadingSpinner />;
+  }
+
+  const displayError = error && traceStatus === 'failed';
+
+  return (
+    <Paper elevation={0} sx={{ mt: 3, p: { xs: 1, sm: 2 }, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+      <Typography variant="h6" gutterBottom align="center">MAC Trace Results</Typography>
+
+      {displayError && <ErrorMessage error={error} title="MAC Trace Error" />}
+
+      {/* Display results only if trace has run */}
+      {(traceStatus === 'succeeded' || traceStatus === 'failed') && !displayError && (
+        <Box>
+            {/* Simplified Display: IP <-> DG */}
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                 <Paper elevation={1} sx={{ p: 1, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText', minWidth: '120px' }}>
+                    <Typography variant="overline" sx={{lineHeight: 1.2}}>Endpoint</Typography>
+                    <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{ip || 'N/A'}</Typography>
+                </Paper>
+                <Typography variant="h5">↔</Typography>
+                 <Paper elevation={1} sx={{ p: 1, textAlign: 'center', minWidth: '120px' }}>
+                    <Typography variant="overline" sx={{lineHeight: 1.2}}>Gateway</Typography>
+                    <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{dg || 'N/A'}</Typography>
+                 </Paper>
+            </Box>
+
+          {/* Display Hops */}
+          {traceResult && traceResult.length > 0 ? (
+            <Stack
+              direction="row"
+              spacing={0} // Handled by HopDisplay
+              alignItems="center"
+              sx={{
+                overflowX: 'auto', // Enable horizontal scrolling
+                minWidth: 0, // <<<--- ADD THIS LINE
+                maxWidth: '70vw',
+                py: 2,
+                px: 1,
+                borderTop: '1px dashed',
+                borderBottom: '1px dashed',
+                borderColor: 'divider',
+                my: 2,
+                minHeight: '100px',
+              }}
+            >
+              {traceResult.map((hop, index) => (
+                <HopDisplay
+                  key={`${hop.device_id || hop.ip}-${hop.hop}-${index}`}
+                  hopData={hop}
+                  isFirst={index === 0}
+                  isLast={index === traceResult.length - 1}
+                />
+              ))}
+            </Stack>
+          ) : (
+             traceStatus === 'succeeded' && (!traceResult || traceResult.length === 0) && (
+                <Typography align="center" color="text.secondary" sx={{ my: 3 }}>
+                    No MAC trace hops returned.
+                </Typography>
+             )
+          )}
+        </Box>
+      )}
+
+      {/* Initial state message */}
+      {traceStatus === 'idle' && !error && (
+        <Typography align="center" color="text.secondary">Enter details and click 'Trace MAC Path' to see results.</Typography>
+      )}
+    </Paper>
+  );
+};
+
+export default MacTraceVisualizer;
+
+// ----- End File: src/components/RouteTrace/MacTraceVisualizer.jsx -----
+
+// ----- End File: src\components\RouteTrace\MacTraceVisualizer.jsx -----
+
+// ----- File: src\components\RouteTrace\RouteComparisonContainer.jsx -----
+
+// ----- File: src/components/RouteTrace/RouteComparisonContainer.jsx -----
+
+import React from 'react';
+import { Box, Grid } from '@mui/material';
+
+// Now accepts traces and the specific Section Component to render as props
+const RouteComparisonContainer = ({ traces = [], SectionComponent }) => {
   const canRemove = traces.length > 1;
 
   // Determine grid sizing based on number of traces
@@ -1359,12 +2232,18 @@ const RouteComparisonContainer = () => {
   if (traces.length === 2) mdSize = 6;
   if (traces.length >= 3) mdSize = 4; // Max 3 side-by-side on medium screens
 
+  if (!SectionComponent) {
+    console.error("RouteComparisonContainer requires a SectionComponent prop.");
+    return <Box sx={{ color: 'error.main' }}>Error: SectionComponent not provided.</Box>;
+  }
+
   return (
     <Box>
       <Grid container spacing={3}>
         {traces.map((trace) => (
           <Grid item xs={12} md={mdSize} key={trace.id}>
-             <RouteTraceSection trace={trace} canRemove={canRemove} />
+             {/* Render the passed-in SectionComponent */}
+             <SectionComponent trace={trace} canRemove={canRemove} />
           </Grid>
         ))}
       </Grid>
@@ -1373,6 +2252,8 @@ const RouteComparisonContainer = () => {
 };
 
 export default RouteComparisonContainer;
+
+// ----- End File: src/components/RouteTrace/RouteComparisonContainer.jsx -----
 
 // ----- End File: src\components\RouteTrace\RouteComparisonContainer.jsx -----
 
@@ -1588,7 +2469,7 @@ export default RouteTraceSection;
 
 // ----- File: src\components\RouteTrace\RouteVisualizer.jsx -----
 
-// ----- File: src/components/RouteTrace/RouteVisualizer.jsx -----
+// src/components/RouteTrace/RouteVisualizer.jsx
 
 import React from 'react';
 import { Box, Typography, Stack, Paper } from '@mui/material';
@@ -1600,46 +2481,45 @@ import MacTraceDisplay from './MacTraceDisplay';
 const RouteVisualizer = ({ trace }) => {
   const {
     sourceIp, destinationIp, sourceDg, destinationDg,
-    mainRouteTrace, sourceMacTrace, destinationMacTrace,
-    traceStatus, sourceDgStatus, destinationDgStatus, error
+    mainRouteTrace,
+    sourceMacTrace,
+    destinationMacTrace,
+    traceStatus,
+    error
   } = trace;
 
   if (traceStatus === 'loading') {
     return <LoadingSpinner />;
   }
 
-  // Only show main trace error here, DG errors are shown in the input form
-  const mainTraceError = error && (traceStatus === 'failed' || (traceStatus === 'partial_success' && !mainRouteTrace));
+  const displayError = error && (traceStatus === 'failed' || traceStatus === 'partial_success');
 
   return (
-    <Paper elevation={0} sx={{ mt: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+    <Paper elevation={0} sx={{ mt: 3, p: { xs: 1, sm: 2 }, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
       <Typography variant="h6" gutterBottom align="center">Trace Results</Typography>
 
-      {/* Display overall error only if the main trace failed */}
-      {mainTraceError && <ErrorMessage error={error} title="Main Trace Problem" />}
-
+      {displayError && <ErrorMessage error={error} title="Trace Problem" />}
 
       {(traceStatus === 'succeeded' || traceStatus === 'partial_success' || traceStatus === 'failed') && (
         <Box>
           {/* 1. Source IP Box */}
-           <Paper elevation={2} sx={{ p: 1.5, mb: 1, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-              <Typography variant="overline">Source</Typography>
-              <Typography variant="body1">{sourceIp}</Typography>
+           <Paper elevation={1} sx={{ p: 1, mb: 1, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+              <Typography variant="overline" sx={{lineHeight: 1.2}}>Source</Typography>
+              <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{sourceIp}</Typography>
           </Paper>
 
-          {/* 2. Source MAC Trace */}
+          {/* 2. Source MAC Trace (already updated internally) */}
           <MacTraceDisplay
-            label={`${sourceIp} <-> ${sourceDg}`}
-            hops={sourceMacTrace} // Pass the array of hops
-            isLoading={traceStatus === 'loading'}
-            // Pass specific error if source MAC trace failed during partial success, otherwise let MacTraceDisplay show the generic error if overall status is 'failed'
-            error={(traceStatus === 'partial_success' || traceStatus === 'failed') && !sourceMacTrace ? (error || "Failed to retrieve source MAC trace") : null}
+            label={`${sourceIp || 'Src'} ↔ ${sourceDg || 'DG'}`}
+            hops={sourceMacTrace}
+            isLoading={false}
+            error={traceStatus === 'partial_success' && !sourceMacTrace ? "Failed to retrieve source MAC trace" : null}
            />
 
            {/* 3. Source DG Box */}
-           <Paper elevation={2} sx={{ p: 1.5, my: 1, textAlign: 'center' }}>
-              <Typography variant="overline">Source DG</Typography>
-              <Typography variant="body1">{sourceDg}</Typography>
+           <Paper elevation={1} sx={{ p: 1, my: 1, textAlign: 'center' }}>
+              <Typography variant="overline" sx={{lineHeight: 1.2}}>Source DG</Typography>
+              <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{sourceDg}</Typography>
            </Paper>
 
 
@@ -1647,21 +2527,26 @@ const RouteVisualizer = ({ trace }) => {
           {mainRouteTrace && mainRouteTrace.length > 0 ? (
             <Stack
               direction="row"
-              spacing={0} // Let HopDisplay handle spacing with icons
-              alignItems="flex-start" // Align tops of papers
+              spacing={0}
+              alignItems="center"
               sx={{
-                overflowX: 'auto', // Enable horizontal scrolling for many hops
+                overflowX: 'auto',
+                minWidth: 0,
+                maxWidth: '70vw', // <<<--- ADDED THIS LINE
                 py: 2,
-                px: 1, // Padding for scroll container
-                borderTop: '1px dashed',
-                borderBottom: '1px dashed',
+                px: 1,
+                borderTop: '2px dashed',
+                borderBottom: '2px dashed',
                 borderColor: 'divider',
                 my: 2,
+                minHeight: '100px',
+                // Optional: Center the stack if content is narrower than maxWidth
+                // marginX: 'auto',
               }}
             >
               {mainRouteTrace.map((hop, index) => (
                 <HopDisplay
-                  key={hop.hop || index}
+                  key={`${hop.device_id || hop.ip}-${hop.hop}-${index}`}
                   hopData={hop}
                   isFirst={index === 0}
                   isLast={index === mainRouteTrace.length - 1}
@@ -1669,7 +2554,7 @@ const RouteVisualizer = ({ trace }) => {
               ))}
             </Stack>
           ) : (
-             traceStatus !== 'idle' && traceStatus !== 'loading' && !mainTraceError && ( // Show message only if main trace didn't fail outright
+             traceStatus !== 'idle' && traceStatus !== 'loading' && !displayError && (
                 <Typography align="center" color="text.secondary" sx={{ my: 3 }}>
                     {mainRouteTrace === null ? 'Main route trace did not run or failed.' : 'No hops returned for main route.'}
                 </Typography>
@@ -1677,28 +2562,31 @@ const RouteVisualizer = ({ trace }) => {
           )}
 
            {/* 5. Destination DG Box */}
-           <Paper elevation={2} sx={{ p: 1.5, my: 1, textAlign: 'center' }}>
-              <Typography variant="overline">Destination DG</Typography>
-              <Typography variant="body1">{destinationDg}</Typography>
+           <Paper elevation={1} sx={{ p: 1, my: 1, textAlign: 'center' }}>
+              <Typography variant="overline" sx={{lineHeight: 1.2}}>Destination DG</Typography>
+              <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{destinationDg}</Typography>
            </Paper>
 
-          {/* 6. Destination MAC Trace */}
+          {/* 6. Destination MAC Trace (already updated internally) */}
           <MacTraceDisplay
-            label={`${destinationDg} <-> ${destinationIp}`}
-            hops={destinationMacTrace} // Pass the array of hops
-            isLoading={traceStatus === 'loading'}
-            error={(traceStatus === 'partial_success' || traceStatus === 'failed') && !destinationMacTrace ? (error || "Failed to retrieve destination MAC trace") : null}
+            label={`${destinationDg || 'DG'} ↔ ${destinationIp || 'Dst'}`}
+            hops={destinationMacTrace}
+            isLoading={false}
+            error={traceStatus === 'partial_success' && !destinationMacTrace ? "Failed to retrieve destination MAC trace" : null}
            />
 
             {/* 7. Destination IP Box */}
-           <Paper elevation={2} sx={{ p: 1.5, mt: 1, textAlign: 'center', bgcolor: 'secondary.light', color: 'secondary.contrastText' }}>
-              <Typography variant="overline">Destination</Typography>
-              <Typography variant="body1">{destinationIp}</Typography>
+           <Paper elevation={1} sx={{ p: 1, mt: 1, textAlign: 'center', bgcolor: 'secondary.light', color: 'secondary.contrastText' }}>
+              <Typography variant="overline" sx={{lineHeight: 1.2}}>Destination</Typography>
+              <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{destinationIp}</Typography>
            </Paper>
 
         </Box>
       )}
-      {traceStatus === 'idle' && !error && ( <Typography align="center" color="text.secondary">Enter details and click 'Trace Route' to see results.</Typography>
+
+      {/* Initial state message */}
+      {traceStatus === 'idle' && !error && (
+        <Typography align="center" color="text.secondary">Enter details and click 'Trace Route' to see results.</Typography>
       )}
     </Paper>
   );
@@ -1812,6 +2700,56 @@ export default AllRoutesPage;
 
 // ----- End File: src\pages\AllRoutesPage.jsx -----
 
+// ----- File: src\pages\DirectRouteTracePage.jsx -----
+
+// ----- File: src/pages/DirectRouteTracePage.jsx -----
+
+import React from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { Button, Box, Typography } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
+import DirectRouteTraceSection from '../components/RouteTrace/DirectRouteTraceSection'; // Import the correct section
+import { addDirectTraceSection } from '../store/slices/directRouteSlice'; // Use correct slice action
+
+const DirectRouteTracePage = () => {
+    const dispatch = useDispatch();
+    // Select state from the directRouteTrace slice
+    const traces = useSelector((state) => state.directRoute.traces);
+
+    const handleAddRoute = () => {
+        dispatch(addDirectTraceSection()); // Dispatch action from directRouteSlice
+    }
+
+  return (
+    <Box>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Trace Direct Network Route
+      </Typography>
+
+      {/* Pass the specific SectionComponent */}
+      <RouteComparisonContainer traces={traces} SectionComponent={DirectRouteTraceSection} />
+
+       <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+            <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={handleAddRoute}
+                disabled={traces.length >= 5} // Optional limit
+            >
+                Add Trace for Comparison
+            </Button>
+       </Box>
+    </Box>
+  );
+};
+
+export default DirectRouteTracePage;
+
+// ----- End File: src/pages/DirectRouteTracePage.jsx -----
+
+// ----- End File: src\pages\DirectRouteTracePage.jsx -----
+
 // ----- File: src\pages\HistoryPage.jsx -----
 
 import React, { useEffect } from 'react';
@@ -1866,6 +2804,56 @@ export default LoginPage;
 
 // ----- End File: src\pages\LoginPage.jsx -----
 
+// ----- File: src\pages\MacTracePage.jsx -----
+
+// ----- File: src/pages/MacTracePage.jsx -----
+
+import React from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { Button, Box, Typography } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
+import MacTraceSection from '../components/RouteTrace/MacTraceSection'; // Import the correct section
+import { addMacTraceSection } from '../store/slices/macTraceSlice'; // Use correct slice action
+
+const MacTracePage = () => {
+    const dispatch = useDispatch();
+    // Select state from the macTrace slice
+    const traces = useSelector((state) => state.macTrace.traces);
+
+    const handleAddRoute = () => {
+        dispatch(addMacTraceSection()); // Dispatch action from macTraceSlice
+    }
+
+  return (
+    <Box>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Trace MAC Path (Endpoint ↔ Gateway)
+      </Typography>
+
+      {/* Pass the specific SectionComponent */}
+      <RouteComparisonContainer traces={traces} SectionComponent={MacTraceSection} />
+
+       <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+            <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={handleAddRoute}
+                disabled={traces.length >= 5} // Optional limit
+            >
+                Add Trace for Comparison
+            </Button>
+       </Box>
+    </Box>
+  );
+};
+
+export default MacTracePage;
+
+// ----- End File: src/pages/MacTracePage.jsx -----
+
+// ----- End File: src\pages\MacTracePage.jsx -----
+
 // ----- File: src\pages\NotFoundPage.jsx -----
 
 import React from 'react';
@@ -1892,27 +2880,34 @@ export default NotFoundPage;
 
 // ----- File: src\pages\RouteTracePage.jsx -----
 
+// ----- File: src/pages/RouteTracePage.jsx -----
+
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Button, Box, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
-import { addTraceSection } from '../store/slices/routeTraceSlice';
+import RouteTraceSection from '../components/RouteTrace/RouteTraceSection'; // Import the specific section for this page
+import { addTraceSection } from '../store/slices/routeTraceSlice'; // Use the correct slice action for this page
 
 const RouteTracePage = () => {
     const dispatch = useDispatch();
+    // Select state from the original routeTrace slice
     const traces = useSelector((state) => state.routeTrace.traces);
 
     const handleAddRoute = () => {
-        dispatch(addTraceSection());
+        dispatch(addTraceSection()); // Dispatch action from routeTraceSlice
     }
 
   return (
     <Box>
       <Typography variant="h4" component="h1" gutterBottom>
-        Trace Network Route
+        Trace Network Route (Combined) {/* Added (Combined) for clarity */}
       </Typography>
-      <RouteComparisonContainer />
+
+      {/* Pass the correct SectionComponent prop */}
+      <RouteComparisonContainer traces={traces} SectionComponent={RouteTraceSection} />
+
        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
             <Button
                 variant="outlined"
@@ -1928,6 +2923,8 @@ const RouteTracePage = () => {
 };
 
 export default RouteTracePage;
+
+// ----- End File: src/pages/RouteTracePage.jsx -----
 
 // ----- End File: src\pages\RouteTracePage.jsx -----
 
@@ -2221,19 +3218,195 @@ export default authSlice.reducer;
 
 // ----- End File: src\store\slices\authSlice.js -----
 
+// ----- File: src\store\slices\directRouteSlice.js -----
+
+// ----- File: src/store/slices/directRouteSlice.js -----
+
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import routeService from '../../services/routeService';
+import { v4 as uuidv4 } from 'uuid';
+
+// Helper to create initial trace state for Direct Route trace
+const createInitialDirectTraceState = () => ({
+  id: uuidv4(),
+  sourceIp: '',
+  destinationIp: '',
+  sourceDg: '',
+  destinationDg: '',
+  vrf: '', // Add VRF field
+  sourceDgStatus: 'idle',
+  destinationDgStatus: 'idle',
+  traceStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed'
+  traceResult: null, // Will hold the List[DetailedHop] for the direct route trace
+  error: null,
+});
+
+// --- Async Thunks ---
+
+// Reusable fetch DG logic
+export const fetchDirectDefaultGateway = createAsyncThunk(
+  'directRoute/fetchDefaultGateway',
+  async ({ ip, type, traceId }, { rejectWithValue }) => {
+    if (!ip) return rejectWithValue({ message: "IP address is required.", type, traceId });
+    try {
+      const gateway = await routeService.getDefaultGateway(ip);
+      if (!gateway) throw new Error("No gateway found by backend.");
+      return { gateway, type, traceId };
+    } catch (error) {
+      return rejectWithValue({ message: error.message || 'Failed to fetch DG', type, traceId });
+    }
+  }
+);
+
+// Thunk to perform the Direct Route trace
+export const performDirectRouteTrace = createAsyncThunk(
+  'directRoute/performDirectRouteTrace',
+  async ({ traceId, sourceIp, destinationIp, sourceDg, destinationDg, vrf }, { rejectWithValue }) => {
+    if (!sourceIp || !destinationIp || !sourceDg || !destinationDg) {
+        return rejectWithValue({ message: "Source IP, Destination IP, Source DG, and Destination DG are required.", traceId });
+    }
+    try {
+      // Call the specific backend endpoint for direct route trace
+      const result = await routeService.getRouteTrace(
+          sourceIp, destinationIp, sourceDg, destinationDg, null, null, vrf // Map frontend names to backend params (dg_name params omitted, vrf added)
+      );
+      return { traceId, result }; // result is expected List[DetailedHop]
+    } catch (error) {
+      return rejectWithValue({ message: error.message || 'Direct route trace failed', traceId, errorObj: error });
+    }
+  }
+);
+
+// --- Slice Definition ---
+
+const initialState = {
+  traces: [createInitialDirectTraceState()], // Start with one direct trace section
+};
+
+const directRouteSlice = createSlice({
+  name: 'directRoute',
+  initialState,
+  reducers: {
+    addDirectTraceSection: (state) => {
+       if (state.traces.length < 5) {
+         state.traces.push(createInitialDirectTraceState());
+       }
+    },
+    removeDirectTraceSection: (state, action) => {
+        const traceIdToRemove = action.payload;
+        if (state.traces.length > 1) {
+            state.traces = state.traces.filter(trace => trace.id !== traceIdToRemove);
+        }
+    },
+    updateDirectTraceInput: (state, action) => {
+      const { traceId, field, value } = action.payload;
+      const trace = state.traces.find(t => t.id === traceId);
+      if (trace) {
+        trace[field] = value;
+        // Reset status and results when inputs change
+        trace.traceStatus = 'idle';
+        trace.traceResult = null;
+        trace.error = null;
+
+        // Handle DG status updates
+        if (field === 'sourceDg' && trace.sourceDgStatus !== 'loading') trace.sourceDgStatus = 'manual';
+        if (field === 'destinationDg' && trace.destinationDgStatus !== 'loading') trace.destinationDgStatus = 'manual';
+        if (field === 'sourceIp') {
+            trace.sourceDg = ''; trace.sourceDgStatus = 'idle';
+        }
+        if (field === 'destinationIp') {
+            trace.destinationDg = ''; trace.destinationDgStatus = 'idle';
+        }
+      }
+    },
+    resetDirectTraceState: (state) => {
+        state.traces = [createInitialDirectTraceState()];
+    }
+  },
+  extraReducers: (builder) => {
+    builder
+      // Default Gateway Fetching (identical logic to other slices)
+      .addCase(fetchDirectDefaultGateway.pending, (state, action) => {
+        const { type, traceId } = action.meta.arg;
+        const trace = state.traces.find(t => t.id === traceId);
+        if (trace) {
+          if (type === 'source') trace.sourceDgStatus = 'loading';
+          if (type === 'destination') trace.destinationDgStatus = 'loading';
+          trace.error = null;
+        }
+      })
+      .addCase(fetchDirectDefaultGateway.fulfilled, (state, action) => {
+        const { gateway, type, traceId } = action.payload;
+        const trace = state.traces.find(t => t.id === traceId);
+        if (trace) {
+          if (type === 'source') { trace.sourceDg = gateway; trace.sourceDgStatus = 'succeeded'; }
+          if (type === 'destination') { trace.destinationDg = gateway; trace.destinationDgStatus = 'succeeded'; }
+        }
+      })
+      .addCase(fetchDirectDefaultGateway.rejected, (state, action) => {
+        const { message, type, traceId } = action.payload;
+        const trace = state.traces.find(t => t.id === traceId);
+         if (trace) {
+          if (type === 'source') trace.sourceDgStatus = 'failed';
+          if (type === 'destination') trace.destinationDgStatus = 'failed';
+          trace.error = `DG Fetch Error (${type}): ${message}`;
+        }
+      })
+
+      // Direct Route Trace Execution
+      .addCase(performDirectRouteTrace.pending, (state, action) => {
+        const { traceId } = action.meta.arg;
+        const trace = state.traces.find(t => t.id === traceId);
+        if (trace) {
+          trace.traceStatus = 'loading';
+          trace.error = null;
+          trace.traceResult = null; // Clear previous result
+        }
+      })
+      .addCase(performDirectRouteTrace.fulfilled, (state, action) => {
+        const { traceId, result } = action.payload;
+        const trace = state.traces.find(t => t.id === traceId);
+        if (trace) {
+          trace.traceStatus = 'succeeded';
+          trace.traceResult = result; // Store the List[DetailedHop]
+          trace.error = null;
+        }
+      })
+      .addCase(performDirectRouteTrace.rejected, (state, action) => {
+        const { message, traceId } = action.payload;
+        const trace = state.traces.find(t => t.id === traceId);
+        if (trace) {
+          trace.traceStatus = 'failed';
+          trace.error = message;
+          trace.traceResult = null; // Ensure result is null on failure
+        }
+      });
+  },
+});
+
+export const { addDirectTraceSection, removeDirectTraceSection, updateDirectTraceInput, resetDirectTraceState } = directRouteSlice.actions;
+export default directRouteSlice.reducer;
+
+// ----- End File: src/store/slices/directRouteSlice.js -----
+
+// ----- End File: src\store\slices\directRouteSlice.js -----
+
 // ----- File: src\store\slices\historySlice.js -----
 
+// src/store/slices/historySlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import routeService from '../../services/routeService';
 
 // Helper to safely parse JSON
 const safeParseJson = (jsonString, defaultValue = null) => {
-  if (typeof jsonString !== 'string') return jsonString; // Already parsed or not a string
+  // Added check for already parsed objects which might happen in some scenarios
+  if (typeof jsonString === 'object' && jsonString !== null) return jsonString;
+  if (typeof jsonString !== 'string') return defaultValue; // Return default if not string or object
   try {
     return JSON.parse(jsonString);
   } catch (e) {
-    console.error("Failed to parse route JSON:", e);
-    return defaultValue; // Return null or default if parsing fails
+    console.error("Failed to parse JSON:", e, "Input:", jsonString);
+    return defaultValue; // Return default if parsing fails
   }
 };
 
@@ -2243,12 +3416,15 @@ export const fetchUserHistory = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const routes = await routeService.getUserRoutes();
-      // Assuming routes is an array: [{id, source, destination, route(json_string), timestamp, device_additional_info(json_string? check model), ...}, ...]
+      // Backend returns RouteHistoryEntry model
+      // route field is a JSON string of List[DetailedHop]
+      // device_additional_info is optional JSON string
       return routes.map(r => ({
         ...r,
-        // Parse potentially nested JSON strings
-        routeData: safeParseJson(r.route),
-        deviceInfo: safeParseJson(r.device_additional_info), // Adjust field name based on DB model
+        // Parse the JSON strings into objects/arrays
+        // Ensure routeData becomes an array of hops or null/empty array
+        routeData: safeParseJson(r.route, []), // Default to empty array if parse fails
+        deviceInfo: safeParseJson(r.device_additional_info), // Default to null
       }));
     } catch (error) {
       return rejectWithValue(error.message || 'Failed to fetch user history');
@@ -2264,8 +3440,10 @@ export const fetchAllHistory = createAsyncThunk(
       const routes = await routeService.getAllRoutes();
        return routes.map(r => ({
         ...r,
-        routeData: safeParseJson(r.route),
+        routeData: safeParseJson(r.route, []),
         deviceInfo: safeParseJson(r.device_additional_info),
+        // Keep user info if backend provides it
+        user: r.user || null
       }));
     } catch (error) {
       return rejectWithValue(error.message || 'Failed to fetch all routes');
@@ -2324,6 +3502,169 @@ export const { resetHistoryError } = historySlice.actions;
 export default historySlice.reducer;
 
 // ----- End File: src\store\slices\historySlice.js -----
+
+// ----- File: src\store\slices\macTraceSlice.js -----
+
+// ----- File: src/store/slices/macTraceSlice.js -----
+
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import routeService from '../../services/routeService';
+import { v4 as uuidv4 } from 'uuid';
+
+// Helper to create initial trace state for MAC trace
+const createInitialMacTraceState = () => ({
+  id: uuidv4(),
+  ip: '', // Endpoint IP
+  dg: '', // Default Gateway
+  dgStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed', 'manual'
+  traceStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed'
+  traceResult: null, // Will hold the List[DetailedHop] for the MAC trace
+  error: null,
+});
+
+// --- Async Thunks ---
+
+// Reusable fetch DG logic (or could import from a shared utility if needed)
+export const fetchMacDefaultGateway = createAsyncThunk(
+  'macTrace/fetchDefaultGateway',
+  async ({ ip, traceId }, { rejectWithValue }) => {
+    if (!ip) return rejectWithValue({ message: "IP address is required.", traceId });
+    try {
+      const gateway = await routeService.getDefaultGateway(ip);
+      if (!gateway) throw new Error("No gateway found by backend.");
+      return { gateway, traceId }; // Only need gateway and traceId
+    } catch (error) {
+      return rejectWithValue({ message: error.message || 'Failed to fetch DG', traceId });
+    }
+  }
+);
+
+// Thunk to perform the MAC trace
+export const performMacTrace = createAsyncThunk(
+  'macTrace/performMacTrace',
+  async ({ traceId, ip, dg }, { rejectWithValue }) => {
+    if (!ip || !dg) {
+        return rejectWithValue({ message: "Endpoint IP and Default Gateway are required.", traceId });
+    }
+    try {
+      const result = await routeService.getMacTrace(ip, dg);
+      return { traceId, result }; // result is expected List[DetailedHop]
+    } catch (error) {
+      return rejectWithValue({ message: error.message || 'MAC trace failed', traceId, errorObj: error });
+    }
+  }
+);
+
+// --- Slice Definition ---
+
+const initialState = {
+  traces: [createInitialMacTraceState()], // Start with one MAC trace section
+};
+
+const macTraceSlice = createSlice({
+  name: 'macTrace',
+  initialState,
+  reducers: {
+    addMacTraceSection: (state) => {
+       if (state.traces.length < 5) {
+         state.traces.push(createInitialMacTraceState());
+       }
+    },
+    removeMacTraceSection: (state, action) => {
+        const traceIdToRemove = action.payload;
+        if (state.traces.length > 1) {
+            state.traces = state.traces.filter(trace => trace.id !== traceIdToRemove);
+        }
+    },
+    updateMacTraceInput: (state, action) => {
+      const { traceId, field, value } = action.payload;
+      const trace = state.traces.find(t => t.id === traceId);
+      if (trace) {
+        trace[field] = value;
+        // Reset status and results when inputs change
+        trace.traceStatus = 'idle';
+        trace.traceResult = null;
+        trace.error = null;
+
+        // Mark DG as manually entered if user changes it
+        if (field === 'dg' && trace.dgStatus !== 'loading') trace.dgStatus = 'manual';
+
+        // Reset DG status if IP changes
+        if (field === 'ip') {
+            trace.dg = ''; // Clear old DG if IP changes
+            trace.dgStatus = 'idle';
+        }
+      }
+    },
+    resetMacTraceState: (state) => {
+        state.traces = [createInitialMacTraceState()];
+    }
+  },
+  extraReducers: (builder) => {
+    builder
+      // Default Gateway Fetching
+      .addCase(fetchMacDefaultGateway.pending, (state, action) => {
+        const { traceId } = action.meta.arg;
+        const trace = state.traces.find(t => t.id === traceId);
+        if (trace) {
+          trace.dgStatus = 'loading';
+          trace.error = null; // Clear previous errors
+        }
+      })
+      .addCase(fetchMacDefaultGateway.fulfilled, (state, action) => {
+        const { gateway, traceId } = action.payload;
+        const trace = state.traces.find(t => t.id === traceId);
+        if (trace) {
+            trace.dg = gateway;
+            trace.dgStatus = 'succeeded';
+        }
+      })
+      .addCase(fetchMacDefaultGateway.rejected, (state, action) => {
+        const { message, traceId } = action.payload;
+        const trace = state.traces.find(t => t.id === traceId);
+         if (trace) {
+          trace.dgStatus = 'failed';
+          trace.error = `DG Fetch Error: ${message}`;
+        }
+      })
+
+      // MAC Trace Execution
+      .addCase(performMacTrace.pending, (state, action) => {
+        const { traceId } = action.meta.arg;
+        const trace = state.traces.find(t => t.id === traceId);
+        if (trace) {
+          trace.traceStatus = 'loading';
+          trace.error = null;
+          trace.traceResult = null; // Clear previous result
+        }
+      })
+      .addCase(performMacTrace.fulfilled, (state, action) => {
+        const { traceId, result } = action.payload;
+        const trace = state.traces.find(t => t.id === traceId);
+        if (trace) {
+          trace.traceStatus = 'succeeded';
+          trace.traceResult = result; // Store the List[DetailedHop]
+          trace.error = null;
+        }
+      })
+      .addCase(performMacTrace.rejected, (state, action) => {
+        const { message, traceId } = action.payload;
+        const trace = state.traces.find(t => t.id === traceId);
+        if (trace) {
+          trace.traceStatus = 'failed';
+          trace.error = message;
+          trace.traceResult = null; // Ensure result is null on failure
+        }
+      });
+  },
+});
+
+export const { addMacTraceSection, removeMacTraceSection, updateMacTraceInput, resetMacTraceState } = macTraceSlice.actions;
+export default macTraceSlice.reducer;
+
+// ----- End File: src/store/slices/macTraceSlice.js -----
+
+// ----- End File: src\store\slices\macTraceSlice.js -----
 
 // ----- File: src\store\slices\routeTraceSlice.js -----
 
@@ -2558,21 +3899,29 @@ export default routeTraceSlice.reducer;
 
 // ----- File: src\store\store.js -----
 
+// ----- File: src/store/store.js -----
+
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
-import routeTraceReducer from './slices/routeTraceSlice';
+import routeTraceReducer from './slices/routeTraceSlice'; // Combined trace
+import macTraceReducer from './slices/macTraceSlice'; // MAC trace
+import directRouteReducer from './slices/directRouteSlice'; // Direct route trace
 import historyReducer from './slices/historySlice';
 
 const store = configureStore({
   reducer: {
     auth: authReducer,
-    routeTrace: routeTraceReducer,
+    routeTrace: routeTraceReducer, // State key for combined trace page
+    macTrace: macTraceReducer,     // State key for MAC trace page
+    directRoute: directRouteReducer, // State key for direct route trace page
     history: historyReducer,
   },
   // Middleware is automatically included by configureStore (e.g., thunk)
 });
 
 export default store;
+
+// ----- End File: src/store/store.js -----
 
 // ----- End File: src\store\store.js -----
 

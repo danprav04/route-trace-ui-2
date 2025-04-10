@@ -4,25 +4,16 @@ import React from 'react';
 import { useDispatch } from 'react-redux';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-    Drawer,
-    Box,
-    List,
-    ListItem,
-    ListItemButton,
-    ListItemIcon,
-    ListItemText,
-    Toolbar,
-    Divider,
-    Typography,
-    IconButton,
-    Tooltip
+    Drawer, Box, List, ListItem, ListItemButton, ListItemIcon,
+    ListItemText, Toolbar, Divider, Typography, IconButton, Tooltip
 } from '@mui/material';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import RouteIcon from '@mui/icons-material/Route'; // For Combined Trace Route
-import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // For MAC Trace
-import NetworkCheckIcon from '@mui/icons-material/NetworkCheck'; // For Direct Route Trace
-import HistoryIcon from '@mui/icons-material/History'; // For My History
-import PeopleIcon from '@mui/icons-material/People'; // For All Routes
+import RouteIcon from '@mui/icons-material/Route'; // Combined Trace
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // MAC Trace
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck'; // Direct Route Trace
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows'; // <-- Icon for Comparison Page
+import HistoryIcon from '@mui/icons-material/History'; // My History
+import PeopleIcon from '@mui/icons-material/People'; // All Routes
 import LogoutIcon from '@mui/icons-material/Logout';
 import Brightness4Icon from '@mui/icons-material/Brightness4'; // Dark mode
 import Brightness7Icon from '@mui/icons-material/Brightness7'; // Light mode
@@ -33,25 +24,25 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const location = useLocation();
-    const { user } = useAuth(); // Get user info if needed
+    const { user } = useAuth();
 
     const handleLogout = () => {
         dispatch(logoutUser());
-        navigate('/login'); // Redirect to login after logout
+        navigate('/login');
     };
 
-    // Updated Menu Items
+    // Updated Menu Items including Comparison
     const menuItems = [
         { text: 'Combined Trace', icon: <RouteIcon />, path: '/' },
         { text: 'Direct Route Trace', icon: <NetworkCheckIcon />, path: '/direct-route-trace' },
         { text: 'MAC Trace', icon: <SettingsEthernetIcon />, path: '/mac-trace' },
+        { text: 'Compare Traces', icon: <CompareArrowsIcon />, path: '/comparison' }, // <-- New Comparison Link
         { text: 'My History', icon: <HistoryIcon />, path: '/history' },
         { text: 'All Routes', icon: <PeopleIcon />, path: '/all-routes' },
     ];
 
     const drawerContent = (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* App Logo/Title Area */}
             <Toolbar sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                 <AccountTreeIcon fontSize="large" color="primary" />
                 <Typography variant="h6" noWrap component="div" color="primary">
@@ -59,8 +50,6 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
                 </Typography>
             </Toolbar>
             <Divider />
-
-            {/* Navigation Links */}
             <List sx={{ flexGrow: 1 }}>
                 {menuItems.map((item) => (
                     <ListItem key={item.text} disablePadding>
@@ -76,8 +65,6 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
                     </ListItem>
                 ))}
             </List>
-
-            {/* Bottom Section: Theme Toggle & Logout */}
             <Divider />
             <List>
                  <ListItem disablePadding>
@@ -106,14 +93,11 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
             sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
             aria-label="mailbox folders"
         >
-            {/* Temporary Drawer for Mobile */}
             <Drawer
                 variant="temporary"
                 open={mobileOpen}
                 onClose={handleDrawerToggle}
-                ModalProps={{
-                    keepMounted: true, // Better open performance on mobile.
-                }}
+                ModalProps={{ keepMounted: true }}
                 sx={{
                     display: { xs: 'block', md: 'none' },
                     '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
@@ -121,15 +105,13 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
             >
                 {drawerContent}
             </Drawer>
-
-            {/* Permanent Drawer for Desktop */}
             <Drawer
                 variant="permanent"
                 sx={{
                     display: { xs: 'none', md: 'block' },
                     '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
                 }}
-                open // Permanent drawer is always conceptually 'open'
+                open
             >
                 {drawerContent}
             </Drawer>
