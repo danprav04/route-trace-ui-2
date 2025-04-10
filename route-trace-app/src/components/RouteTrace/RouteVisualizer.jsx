@@ -1,29 +1,26 @@
 // src/components/RouteTrace/RouteVisualizer.jsx
-// Ensure main route trace uses HopDisplay
 
 import React from 'react';
 import { Box, Typography, Stack, Paper } from '@mui/material';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import ErrorMessage from '../Common/ErrorMessage';
-import HopDisplay from './HopDisplay'; // Use the updated HopDisplay
-import MacTraceDisplay from './MacTraceDisplay'; // Use the updated MacTraceDisplay
+import HopDisplay from './HopDisplay';
+import MacTraceDisplay from './MacTraceDisplay';
 
 const RouteVisualizer = ({ trace }) => {
   const {
     sourceIp, destinationIp, sourceDg, destinationDg,
-    mainRouteTrace, // Expected to be List[DetailedHop] or null
-    sourceMacTrace, // Expected to be List[DetailedHop] or null
-    destinationMacTrace, // Expected to be List[DetailedHop] or null
+    mainRouteTrace,
+    sourceMacTrace,
+    destinationMacTrace,
     traceStatus,
-    error // Combined error string or specific error object
+    error
   } = trace;
 
   if (traceStatus === 'loading') {
     return <LoadingSpinner />;
   }
 
-  // Show specific error related to the main trace failing or partial failures.
-  // DG errors are handled in the input form.
   const displayError = error && (traceStatus === 'failed' || traceStatus === 'partial_success');
 
   return (
@@ -32,7 +29,6 @@ const RouteVisualizer = ({ trace }) => {
 
       {displayError && <ErrorMessage error={error} title="Trace Problem" />}
 
-      {/* Display results only if trace has run (succeeded, failed, or partial) */}
       {(traceStatus === 'succeeded' || traceStatus === 'partial_success' || traceStatus === 'failed') && (
         <Box>
           {/* 1. Source IP Box */}
@@ -41,12 +37,11 @@ const RouteVisualizer = ({ trace }) => {
               <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{sourceIp}</Typography>
           </Paper>
 
-          {/* 2. Source MAC Trace */}
+          {/* 2. Source MAC Trace (already updated internally) */}
           <MacTraceDisplay
             label={`${sourceIp || 'Src'} ↔ ${sourceDg || 'DG'}`}
-            hops={sourceMacTrace} // Pass the array of DetailedHop objects
-            isLoading={false} // Loading state handled globally above
-            // Error is shown globally or if specifically only this part failed in partial success
+            hops={sourceMacTrace}
+            isLoading={false}
             error={traceStatus === 'partial_success' && !sourceMacTrace ? "Failed to retrieve source MAC trace" : null}
            />
 
@@ -61,30 +56,33 @@ const RouteVisualizer = ({ trace }) => {
           {mainRouteTrace && mainRouteTrace.length > 0 ? (
             <Stack
               direction="row"
-              spacing={0} // Handled by HopDisplay
-              alignItems="center" // Vertically align items
+              spacing={0}
+              alignItems="center"
               sx={{
-                overflowX: 'auto', // Enable horizontal scrolling
+                overflowX: 'auto',
+                minWidth: 0,
+                maxWidth: '70vw', // <<<--- ADDED THIS LINE
                 py: 2,
-                px: 1, // Padding for scroll container
+                px: 1,
                 borderTop: '2px dashed',
                 borderBottom: '2px dashed',
                 borderColor: 'divider',
                 my: 2,
-                minHeight: '100px', // Ensure some height
+                minHeight: '100px',
+                // Optional: Center the stack if content is narrower than maxWidth
+                // marginX: 'auto',
               }}
             >
               {mainRouteTrace.map((hop, index) => (
                 <HopDisplay
-                  key={`${hop.device_id || hop.ip}-${hop.hop}-${index}`} // More robust key
-                  hopData={hop} // Pass the full detailed hop object
+                  key={`${hop.device_id || hop.ip}-${hop.hop}-${index}`}
+                  hopData={hop}
                   isFirst={index === 0}
                   isLast={index === mainRouteTrace.length - 1}
                 />
               ))}
             </Stack>
           ) : (
-             // Show message only if trace ran but returned no hops, and wasn't a total failure
              traceStatus !== 'idle' && traceStatus !== 'loading' && !displayError && (
                 <Typography align="center" color="text.secondary" sx={{ my: 3 }}>
                     {mainRouteTrace === null ? 'Main route trace did not run or failed.' : 'No hops returned for main route.'}
@@ -98,10 +96,10 @@ const RouteVisualizer = ({ trace }) => {
               <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{destinationDg}</Typography>
            </Paper>
 
-          {/* 6. Destination MAC Trace */}
+          {/* 6. Destination MAC Trace (already updated internally) */}
           <MacTraceDisplay
             label={`${destinationDg || 'DG'} ↔ ${destinationIp || 'Dst'}`}
-            hops={destinationMacTrace} // Pass the array of DetailedHop objects
+            hops={destinationMacTrace}
             isLoading={false}
             error={traceStatus === 'partial_success' && !destinationMacTrace ? "Failed to retrieve destination MAC trace" : null}
            />
@@ -124,3 +122,5 @@ const RouteVisualizer = ({ trace }) => {
 };
 
 export default RouteVisualizer;
+
+// ----- End File: src/components/RouteTrace/RouteVisualizer.jsx -----

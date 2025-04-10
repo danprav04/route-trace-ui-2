@@ -4,12 +4,12 @@ import React from 'react';
 import { Box, Typography, Stack, Paper } from '@mui/material';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import ErrorMessage from '../Common/ErrorMessage';
-import HopDisplay from './HopDisplay'; // Reuse HopDisplay
+import HopDisplay from './HopDisplay';
 
 const DirectRouteVisualizer = ({ trace }) => {
   const {
     sourceIp, destinationIp, sourceDg, destinationDg, vrf,
-    traceResult, // This will hold the List[DetailedHop] from get_route_trace
+    traceResult,
     traceStatus,
     error
   } = trace;
@@ -28,7 +28,6 @@ const DirectRouteVisualizer = ({ trace }) => {
 
       {displayError && <ErrorMessage error={error} title="Direct Route Trace Error" />}
 
-      {/* Display results only if trace has run */}
       {(traceStatus === 'succeeded' || traceStatus === 'failed') && !displayError && (
         <Box>
           {/* Simple Header: Source IP/DG -> Dest IP/DG */}
@@ -50,10 +49,12 @@ const DirectRouteVisualizer = ({ trace }) => {
           {traceResult && traceResult.length > 0 ? (
             <Stack
               direction="row"
-              spacing={0} // Handled by HopDisplay
+              spacing={0}
               alignItems="center"
               sx={{
                 overflowX: 'auto',
+                minWidth: 0,
+                maxWidth: '70vw', // <<<--- ADDED THIS LINE
                 py: 2,
                 px: 1,
                 borderTop: '1px dashed',
@@ -61,6 +62,8 @@ const DirectRouteVisualizer = ({ trace }) => {
                 borderColor: 'divider',
                 my: 2,
                 minHeight: '100px',
+                 // Optional: Center the stack if content is narrower than maxWidth
+                // marginX: 'auto',
               }}
             >
               {traceResult.map((hop, index) => (

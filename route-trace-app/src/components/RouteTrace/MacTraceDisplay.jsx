@@ -34,6 +34,7 @@ const MacTraceDisplay = ({ label, hops, isLoading, error }) => {
               alignItems="center" // Center items vertically
               sx={{
                 overflowX: 'auto', // Enable horizontal scrolling
+                minWidth: 0, // <<<--- ADD THIS LINE TO PREVENT STACK FROM OVER-EXPANDING
                 py: 1,
                 px: 1,
                 minHeight: '70px', // Ensure minimum height even with few hops
@@ -57,3 +58,5 @@ const MacTraceDisplay = ({ label, hops, isLoading, error }) => {
 };
 
 export default MacTraceDisplay;
+
+// ----- End File: src/components/RouteTrace/MacTraceDisplay.jsx -----

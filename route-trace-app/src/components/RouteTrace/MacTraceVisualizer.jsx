@@ -50,7 +50,9 @@ const MacTraceVisualizer = ({ trace }) => {
               spacing={0} // Handled by HopDisplay
               alignItems="center"
               sx={{
-                overflowX: 'auto',
+                overflowX: 'auto', // Enable horizontal scrolling
+                minWidth: 0, // <<<--- ADD THIS LINE
+                maxWidth: '70vw',
                 py: 2,
                 px: 1,
                 borderTop: '1px dashed',

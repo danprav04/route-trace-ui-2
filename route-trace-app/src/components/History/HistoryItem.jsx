@@ -10,30 +10,27 @@ import {
     Paper,
     Stack,
     Chip,
-    Accordion, // Using Accordion for better grouping
+    Accordion,
     AccordionSummary,
     AccordionDetails,
-    Divider // Keep Divider if used, otherwise remove
+    Divider
 } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
-import DeviceUnknownIcon from '@mui/icons-material/DeviceUnknown'; // Placeholder icon
-import AccountTreeIcon from '@mui/icons-material/AccountTree'; // <-- MOVED TO TOP
-import HopDisplay from '../RouteTrace/HopDisplay'; // Reuse HopDisplay
+import DeviceUnknownIcon from '@mui/icons-material/DeviceUnknown';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import HopDisplay from '../RouteTrace/HopDisplay';
 import { formatTimestamp } from '../../utils/formatters';
 
 
 const HistoryItem = ({ route }) => {
   const [open, setOpen] = useState(false);
-  // routeData is now expected to be an array of DetailedHop objects
-  // deviceInfo is expected to be an object or null
   const { id, source, destination, timestamp, routeData, deviceInfo, user } = route;
 
   const handleClick = () => {
     setOpen(!open);
   };
 
-  // Check if routeData is a non-empty array
   const hasValidRouteData = Array.isArray(routeData) && routeData.length > 0;
 
   return (
@@ -63,7 +60,7 @@ const HistoryItem = ({ route }) => {
 
       {/* Collapsible Details Section */}
       <Collapse in={open} timeout="auto" unmountOnExit>
-        <Paper sx={{ p: 0, m: 1, bgcolor: 'background.default' }} elevation={0}> {/* Use default bg, no extra elevation */}
+        <Paper sx={{ p: 0, m: 1, bgcolor: 'background.default' }} elevation={0}>
 
             {/* Device Info Accordion (if available) */}
             {deviceInfo && typeof deviceInfo === 'object' && Object.keys(deviceInfo).length > 0 && (
@@ -92,28 +89,32 @@ const HistoryItem = ({ route }) => {
                         aria-controls={`panel-routedata-${id}-content`}
                         id={`panel-routedata-${id}-header`}
                      >
-                         <AccountTreeIcon sx={{mr: 1, color: 'action.active'}} /> {/* Use appropriate icon */}
+                         <AccountTreeIcon sx={{mr: 1, color: 'action.active'}} />
                          <Typography variant="subtitle2">Detailed Route Hops ({routeData.length})</Typography>
                      </AccordionSummary>
-                     <AccordionDetails sx={{ p: 1 }}> {/* Padding for scroll container */}
+                     <AccordionDetails sx={{ p: 1 }}>
                          <Stack
                              direction="row"
-                             spacing={0} // Handled by HopDisplay
+                             spacing={0}
                              alignItems="center"
                              sx={{
-                                 overflowX: 'auto', // Enable horizontal scrolling
+                                 overflowX: 'auto',
+                                 minWidth: 0,         // <<<--- ADDED THIS LINE
+                                 maxWidth: '70vw',    // <<<--- ADDED THIS LINE
                                  py: 1,
                                  px: 1,
                                  border: '1px dashed',
                                  borderColor: 'divider',
                                  borderRadius: 1,
-                                 minHeight: '90px', // Ensure some height
+                                 minHeight: '90px',
+                                 // Optional: Center the stack if content is narrower than maxWidth
+                                 // marginX: 'auto',
                              }}
                          >
                              {routeData.map((hop, index) => (
                                  <HopDisplay
-                                     key={`${hop.device_id || hop.ip}-${hop.hop}-${index}`} // More robust key
-                                     hopData={hop} // Pass the detailed hop object
+                                     key={`${hop.device_id || hop.ip}-${hop.hop}-${index}`}
+                                     hopData={hop}
                                      isFirst={index === 0}
                                      isLast={index === routeData.length - 1}
                                  />
@@ -130,9 +131,8 @@ const HistoryItem = ({ route }) => {
                  </Typography>
             )}
 
-            {/* Display raw routeData if parsing failed but original was string */}
              {typeof route.route === 'string' && (!Array.isArray(routeData) || routeData.length === 0) && (
-                  <Accordion elevation={1} sx={{mt: 1}}> {/* Added margin top */}
+                  <Accordion elevation={1} sx={{mt: 1}}>
                     <AccordionSummary expandIcon={<ExpandMore />} aria-controls={`panel-raw-${id}-content`} id={`panel-raw-${id}-header`}>
                         <Typography variant="caption">Raw Route Data (Parsing Failed or Empty)</Typography>
                     </AccordionSummary>
@@ -149,6 +149,7 @@ const HistoryItem = ({ route }) => {
   );
 };
 
-// Removed the import from the bottom
 
 export default HistoryItem;
+
+// ----- End File: src/components/History/HistoryItem.jsx -----
