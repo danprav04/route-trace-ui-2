@@ -12,7 +12,8 @@ route-trace-app/
 │   │   ├── Common
 │   │   │   ├── ErrorMessage.jsx
 │   │   │   ├── LoadingSpinner.jsx
-│   │   │   └── Navbar.jsx
+│   │   │   ├── Navbar.jsx
+│   │   │   └── Sidebar.jsx
 │   │   ├── History
 │   │   │   ├── HistoryItem.jsx
 │   │   │   └── HistoryList.jsx
@@ -49,7 +50,8 @@ route-trace-app/
 │   ├── index.css
 │   ├── index.js
 │   ├── reportWebVitals.js
-│   └── setupTests.js
+│   ├── setupTests.js
+│   └── theme.js
 ├── .gitignore
 ├── combine_project.js
 ├── package.json
@@ -456,6 +458,8 @@ main();
 
 // ----- File: public\index.html -----
 
+// ----- File: public/index.html -----
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -479,6 +483,7 @@ main();
       href="https://fonts.googleapis.com/icon?family=Material+Icons"
     />
     <title>RouteTrace</title>
+    <!-- Remove inline body style -->
     <style>
       body {
         margin: 0;
@@ -487,7 +492,7 @@ main();
           sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        background-color: #f4f6f8; /* Light grey background */
+        /* Background color will be set by MUI ThemeProvider + CssBaseline */
       }
     </style>
   </head>
@@ -496,6 +501,8 @@ main();
     <div id="root"></div>
   </body>
 </html>
+
+// ----- End File: public/index.html -----
 
 // ----- End File: public\index.html -----
 
@@ -585,17 +592,32 @@ Disallow:
 
 // ----- File: src\App.js -----
 
-import React from 'react';
+// ----- File: src/App.js -----
+
+import React, { useState, useMemo } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Box, Container } from '@mui/material';
+import {
+    Box,
+    CssBaseline,
+    ThemeProvider,
+    AppBar,
+    Toolbar,
+    IconButton,
+    Typography,
+    Container,
+    createTheme // Need createTheme if not directly using the function result
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
 import LoginPage from './pages/LoginPage';
 import RouteTracePage from './pages/RouteTracePage';
 import HistoryPage from './pages/HistoryPage';
 import AllRoutesPage from './pages/AllRoutesPage';
 import NotFoundPage from './pages/NotFoundPage';
-import Navbar from './components/Common/Navbar';
+import Sidebar from './components/Common/Sidebar'; // Import the new Sidebar
 import { useAuth } from './hooks/useAuth';
-import { useSelector } from 'react-redux';
+import getDesignTokens from './theme'; // Import theme config function
+
+const drawerWidth = 240; // Define drawer width here
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -611,48 +633,142 @@ function ProtectedRoute({ children }) {
 }
 
 function App() {
-  const { isAuthenticated } = useAuth(); // Get auth status for Navbar conditional rendering
+  const { isAuthenticated } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  // State to manage theme mode. Could use localStorage for persistence.
+  const [mode, setMode] = useState(() => {
+      // Example: Read initial mode from localStorage or default to 'light'
+      const savedMode = localStorage.getItem('themeMode');
+      return savedMode === 'dark' ? 'dark' : 'light';
+  });
+
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
+  // Theme switching logic
+  const colorMode = useMemo(
+    () => ({
+      toggleColorMode: () => {
+        setMode((prevMode) => {
+          const newMode = prevMode === 'light' ? 'dark' : 'light';
+          // Example: Persist mode to localStorage
+          localStorage.setItem('themeMode', newMode);
+          return newMode;
+        });
+      },
+    }),
+    [],
+  );
+
+  // Create the theme based on the current mode
+  // Use createTheme directly with the result of getDesignTokens
+  const theme = useMemo(() => createTheme(getDesignTokens(mode)), [mode]);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      {isAuthenticated && <Navbar />} {/* Show Navbar only when logged in */}
-      {/* Use Container to constrain max width and center content */}
-      <Container component="main" maxWidth="xl" sx={{ flexGrow: 1, py: 3, mt: isAuthenticated ? 8 : 0 }}> {/* Add margin-top if Navbar exists (64px + padding) */}
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <RouteTracePage />
-              </ProtectedRoute>
-            }
+    <ThemeProvider theme={theme}>
+      <CssBaseline /> {/* Apply baseline styles & background based on theme */}
+      <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+
+        {/* Render Sidebar only if authenticated */}
+        {isAuthenticated && (
+          <Sidebar
+            drawerWidth={drawerWidth}
+            mobileOpen={mobileOpen}
+            handleDrawerToggle={handleDrawerToggle}
+            mode={mode}
+            toggleColorMode={colorMode.toggleColorMode}
           />
-          <Route
-            path="/history"
-            element={
-              <ProtectedRoute>
-                <HistoryPage />
-              </ProtectedRoute>
-            }
-          />
-           <Route
-            path="/all-routes"
-            element={
-              <ProtectedRoute>
-                {/* Add role check here if needed in future */}
-                <AllRoutesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </Container>
-    </Box>
+        )}
+
+        {/* Main content area */}
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            // Add padding top to account for AppBar height only if AppBar is rendered
+            pt: isAuthenticated ? `calc(${theme.mixins.toolbar.minHeight}px + ${theme.spacing(3)})` : theme.spacing(3),
+            pb: 3, // Bottom padding
+            px: 3, // Horizontal padding
+            width: isAuthenticated ? { md: `calc(100% - ${drawerWidth}px)` } : '100%', // Adjust width if drawer is present
+            ml: isAuthenticated ? { md: `${drawerWidth}px` } : 0, // Ensure content doesn't overlap with permanent drawer on desktop
+            transition: theme.transitions.create(['margin', 'width'], { // Smooth transition for sidebar appearance
+                 easing: theme.transitions.easing.sharp,
+                 duration: theme.transitions.duration.leavingScreen,
+            }),
+          }}
+        >
+           {/* AppBar for mobile toggle and title */}
+           {isAuthenticated && (
+                <AppBar
+                    position="fixed"
+                    elevation={1} // Consistent with theme definition
+                    sx={{
+                        width: { md: `calc(100% - ${drawerWidth}px)` }, // Only cover main content area on desktop
+                        ml: { md: `${drawerWidth}px` }, // Position correctly next to drawer on desktop
+                        display: { xs: 'block', md: 'none' } // Only show AppBar on mobile where sidebar is temporary
+                    }}
+                >
+                    <Toolbar>
+                        <IconButton
+                            color="inherit"
+                            aria-label="open drawer"
+                            edge="start"
+                            onClick={handleDrawerToggle}
+                            sx={{ mr: 2, display: { md: 'none' } }} // Show only on mobile
+                        >
+                            <MenuIcon />
+                        </IconButton>
+                        <Typography variant="h6" noWrap component="div">
+                            RouteTrace {/* You can make this dynamic based on page */}
+                        </Typography>
+                    </Toolbar>
+                </AppBar>
+            )}
+
+
+          {/* Container for centering and max-width (optional, adjust maxWidth as needed) */}
+          {/* Using Container might add extra padding, check if needed or just use the Box */}
+          {/* <Container maxWidth="xl"> */}
+             <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route
+                    path="/"
+                    element={
+                    <ProtectedRoute>
+                        <RouteTracePage />
+                    </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/history"
+                    element={
+                    <ProtectedRoute>
+                        <HistoryPage />
+                    </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/all-routes"
+                    element={
+                    <ProtectedRoute>
+                        {/* Add role check here if needed in future */}
+                        <AllRoutesPage />
+                    </ProtectedRoute>
+                    }
+                />
+                <Route path="*" element={<NotFoundPage />} />
+             </Routes>
+          {/* </Container> */}
+        </Box>
+      </Box>
+    </ThemeProvider>
   );
 }
 
 export default App;
+
+// ----- End File: src/App.js -----
 
 // ----- End File: src\App.js -----
 
@@ -878,6 +994,148 @@ const Navbar = () => {
 export default Navbar;
 
 // ----- End File: src\components\Common\Navbar.jsx -----
+
+// ----- File: src\components\Common\Sidebar.jsx -----
+
+// ----- File: src/components/Common/Sidebar.jsx -----
+
+import React from 'react';
+import { useDispatch } from 'react-redux';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
+import {
+    Drawer,
+    Box,
+    List,
+    ListItem,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
+    Toolbar,
+    Divider,
+    Typography,
+    IconButton,
+    Tooltip
+} from '@mui/material';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import RouteIcon from '@mui/icons-material/Route'; // For Trace Route
+import HistoryIcon from '@mui/icons-material/History'; // For My History
+import PeopleIcon from '@mui/icons-material/People'; // For All Routes
+import LogoutIcon from '@mui/icons-material/Logout';
+import Brightness4Icon from '@mui/icons-material/Brightness4'; // Dark mode
+import Brightness7Icon from '@mui/icons-material/Brightness7'; // Light mode
+import { logoutUser } from '../../store/slices/authSlice';
+import { useAuth } from '../../hooks/useAuth';
+
+const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColorMode }) => {
+    const dispatch = useDispatch();
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { user } = useAuth(); // Get user info if needed
+
+    const handleLogout = () => {
+        dispatch(logoutUser());
+        navigate('/login'); // Redirect to login after logout
+    };
+
+    const menuItems = [
+        { text: 'Trace Route', icon: <RouteIcon />, path: '/' },
+        { text: 'My History', icon: <HistoryIcon />, path: '/history' },
+        { text: 'All Routes', icon: <PeopleIcon />, path: '/all-routes' },
+    ];
+
+    const drawerContent = (
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* App Logo/Title Area */}
+            <Toolbar sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                <AccountTreeIcon fontSize="large" color="primary" />
+                <Typography variant="h6" noWrap component="div" color="primary">
+                    RouteTrace
+                </Typography>
+            </Toolbar>
+            <Divider />
+
+            {/* Navigation Links */}
+            <List sx={{ flexGrow: 1 }}>
+                {menuItems.map((item) => (
+                    <ListItem key={item.text} disablePadding>
+                        <ListItemButton
+                            component={RouterLink}
+                            to={item.path}
+                            selected={location.pathname === item.path}
+                            onClick={handleDrawerToggle} // Close mobile drawer on item click
+                        >
+                            <ListItemIcon sx={{ minWidth: '40px' }}>{item.icon}</ListItemIcon>
+                            <ListItemText primary={item.text} />
+                        </ListItemButton>
+                    </ListItem>
+                ))}
+            </List>
+
+            {/* Bottom Section: Theme Toggle & Logout */}
+            <Divider />
+            <List>
+                 <ListItem disablePadding>
+                      <ListItemText sx={{pl: 2}} primary={`User: ${user?.username || 'Unknown'}`} />
+                      <Tooltip title={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}>
+                        <IconButton onClick={toggleColorMode} color="inherit">
+                            {mode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+                        </IconButton>
+                      </Tooltip>
+                 </ListItem>
+                <ListItem disablePadding>
+                    <ListItemButton onClick={handleLogout}>
+                        <ListItemIcon sx={{ minWidth: '40px' }}>
+                            <LogoutIcon />
+                        </ListItemIcon>
+                        <ListItemText primary="Logout" />
+                    </ListItemButton>
+                </ListItem>
+            </List>
+        </Box>
+    );
+
+    return (
+        <Box
+            component="nav"
+            sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
+            aria-label="mailbox folders"
+        >
+            {/* Temporary Drawer for Mobile */}
+            <Drawer
+                variant="temporary"
+                open={mobileOpen}
+                onClose={handleDrawerToggle}
+                ModalProps={{
+                    keepMounted: true, // Better open performance on mobile.
+                }}
+                sx={{
+                    display: { xs: 'block', md: 'none' },
+                    '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+                }}
+            >
+                {drawerContent}
+            </Drawer>
+
+            {/* Permanent Drawer for Desktop */}
+            <Drawer
+                variant="permanent"
+                sx={{
+                    display: { xs: 'none', md: 'block' },
+                    '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+                }}
+                open // Permanent drawer is always conceptually 'open'
+            >
+                {drawerContent}
+            </Drawer>
+        </Box>
+    );
+};
+
+export default Sidebar;
+
+// ----- End File: src/components/Common/Sidebar.jsx -----
+
+// ----- End File: src\components\Common\Sidebar.jsx -----
 
 // ----- File: src\components\History\HistoryItem.jsx -----
 
@@ -1484,34 +1742,33 @@ code {
 
 // ----- File: src\index.js -----
 
+// ----- File: src/index.js -----
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+// Remove ThemeProvider, createTheme, CssBaseline from here
 import App from './App';
 import store from './store/store';
+import './index.css'; // Keep if you have other global non-MUI styles, otherwise remove
 
-// Basic MUI theme (customize as needed)
-const theme = createTheme({
-  palette: {
-    // Add custom theme colors if desired
-  },
-});
+// Old basic theme is removed. Theme is now handled within App.js
+// const theme = createTheme({ ... });
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <Provider store={store}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline /> {/* Normalize CSS and apply background */}
-        <BrowserRouter>
+      {/* Remove ThemeProvider and CssBaseline from here */}
+      <BrowserRouter>
           <App />
-        </BrowserRouter>
-      </ThemeProvider>
+      </BrowserRouter>
     </Provider>
   </React.StrictMode>
 );
+
+// ----- End File: src/index.js -----
 
 // ----- End File: src\index.js -----
 
@@ -2318,6 +2575,83 @@ const store = configureStore({
 export default store;
 
 // ----- End File: src\store\store.js -----
+
+// ----- File: src\theme.js -----
+
+// ----- File: src/theme.js -----
+
+import { createTheme } from '@mui/material/styles';
+import { amber, grey, deepOrange } from '@mui/material/colors';
+
+const getDesignTokens = (mode) => ({
+  palette: {
+    mode,
+    ...(mode === 'light'
+      ? {
+          // palette values for light mode
+          primary: { // Example: Blueish primary
+              main: '#1976d2',
+          },
+          secondary: { // Example: Purpleish secondary
+              main: '#9c27b0',
+          },
+          divider: grey[300], // Lighter divider
+          background: {
+            default: '#f4f6f8', // Light grey background
+            paper: '#ffffff', // White paper background
+          },
+          text: {
+            primary: grey[900],
+            secondary: grey[700],
+          },
+        }
+      : {
+          // palette values for dark mode
+          primary: { // Example: A lighter blue for dark mode
+            main: '#90caf9',
+          },
+          secondary: { // Example: A lighter purple
+            main: '#ce93d8',
+          },
+          divider: grey[700], // Darker divider
+          background: {
+            default: '#121212', // Standard dark background
+            paper: '#1e1e1e', // Slightly lighter paper
+          },
+          text: {
+            primary: '#ffffff',
+            secondary: grey[400],
+          },
+        }),
+  },
+  // You can customize typography, components defaults etc. here
+  typography: {
+      fontFamily: 'Roboto, sans-serif',
+  },
+  components: {
+      // Example: Default props for MuiAppBar
+      MuiAppBar: {
+          defaultProps: {
+              elevation: 1, // Subtle shadow
+          }
+      },
+      // Example: Default props for MuiDrawer
+      MuiDrawer: {
+          styleOverrides: {
+              paper: {
+                  // Add styles if needed, e.g., borderRight for permanent drawer
+                  // borderRight: `1px solid ${mode === 'light' ? grey[300] : grey[700]}`,
+              }
+          }
+      }
+  }
+});
+
+export default getDesignTokens;
+
+// ----- End File: src/theme.js -----
+
+// ----- End File: src\theme.js -----
 
 // ----- File: src\utils\formatters.js -----
 

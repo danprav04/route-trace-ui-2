@@ -1,14 +1,17 @@
+// src/store/slices/historySlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import routeService from '../../services/routeService';
 
 // Helper to safely parse JSON
 const safeParseJson = (jsonString, defaultValue = null) => {
-  if (typeof jsonString !== 'string') return jsonString; // Already parsed or not a string
+  // Added check for already parsed objects which might happen in some scenarios
+  if (typeof jsonString === 'object' && jsonString !== null) return jsonString;
+  if (typeof jsonString !== 'string') return defaultValue; // Return default if not string or object
   try {
     return JSON.parse(jsonString);
   } catch (e) {
-    console.error("Failed to parse route JSON:", e);
-    return defaultValue; // Return null or default if parsing fails
+    console.error("Failed to parse JSON:", e, "Input:", jsonString);
+    return defaultValue; // Return default if parsing fails
   }
 };
 
@@ -18,12 +21,15 @@ export const fetchUserHistory = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const routes = await routeService.getUserRoutes();
-      // Assuming routes is an array: [{id, source, destination, route(json_string), timestamp, device_additional_info(json_string? check model), ...}, ...]
+      // Backend returns RouteHistoryEntry model
+      // route field is a JSON string of List[DetailedHop]
+      // device_additional_info is optional JSON string
       return routes.map(r => ({
         ...r,
-        // Parse potentially nested JSON strings
-        routeData: safeParseJson(r.route),
-        deviceInfo: safeParseJson(r.device_additional_info), // Adjust field name based on DB model
+        // Parse the JSON strings into objects/arrays
+        // Ensure routeData becomes an array of hops or null/empty array
+        routeData: safeParseJson(r.route, []), // Default to empty array if parse fails
+        deviceInfo: safeParseJson(r.device_additional_info), // Default to null
       }));
     } catch (error) {
       return rejectWithValue(error.message || 'Failed to fetch user history');
@@ -39,8 +45,10 @@ export const fetchAllHistory = createAsyncThunk(
       const routes = await routeService.getAllRoutes();
        return routes.map(r => ({
         ...r,
-        routeData: safeParseJson(r.route),
+        routeData: safeParseJson(r.route, []),
         deviceInfo: safeParseJson(r.device_additional_info),
+        // Keep user info if backend provides it
+        user: r.user || null
       }));
     } catch (error) {
       return rejectWithValue(error.message || 'Failed to fetch all routes');
