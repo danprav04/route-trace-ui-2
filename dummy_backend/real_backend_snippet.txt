@@ -581,5 +581,3 @@ def get_route_by_id(route_id: str, request: Request): # route_id passed as path 
 
 # Line 426 is the end of the visible file content
 ```
-
-This transcription is based on the visible code in the images. There might be parts of the files not shown, and OCR isn't perfect, so minor errors could exist, especially with indentation or similar characters. The `tufin.py` file, in particular, was pieced together from multiple non-contiguous snippets.
