@@ -1,28 +1,27 @@
+// ----- File: src/index.js -----
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+// Remove ThemeProvider, createTheme, CssBaseline from here
 import App from './App';
 import store from './store/store';
+import './index.css'; // Keep if you have other global non-MUI styles, otherwise remove
 
-// Basic MUI theme (customize as needed)
-const theme = createTheme({
-  palette: {
-    // Add custom theme colors if desired
-  },
-});
+// Old basic theme is removed. Theme is now handled within App.js
+// const theme = createTheme({ ... });
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <Provider store={store}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline /> {/* Normalize CSS and apply background */}
-        <BrowserRouter>
+      {/* Remove ThemeProvider and CssBaseline from here */}
+      <BrowserRouter>
           <App />
-        </BrowserRouter>
-      </ThemeProvider>
+      </BrowserRouter>
     </Provider>
   </React.StrictMode>
 );
+
+// ----- End File: src/index.js -----
