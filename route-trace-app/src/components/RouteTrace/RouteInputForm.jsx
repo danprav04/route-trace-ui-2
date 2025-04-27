@@ -1,13 +1,15 @@
+// ----- File: src\components\RouteTrace\RouteInputForm.jsx -----
+// Update Grid component to use Grid v2 API
 import React from 'react';
 import { useDispatch } from 'react-redux';
-import { TextField, Button, Box, Grid, CircularProgress, Tooltip, IconButton } from '@mui/material'; // Remove Typography from here later
+import { TextField, Button, Box, Grid, CircularProgress, Tooltip, IconButton, InputAdornment, Typography } from '@mui/material';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import SyncIcon from '@mui/icons-material/Sync';
 import SyncProblemIcon from '@mui/icons-material/SyncProblem';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EditIcon from '@mui/icons-material/Edit';
 import { updateTraceInput, fetchDefaultGateway, performFullTrace } from '../../store/slices/routeTraceSlice';
-import ErrorMessage from '../Common/ErrorMessage'; // <<<--- ADD THIS LINE
+import ErrorMessage from '../Common/ErrorMessage';
 
 const RouteInputForm = ({ trace }) => {
   const dispatch = useDispatch();
@@ -36,124 +38,136 @@ const RouteInputForm = ({ trace }) => {
   const isFetchingDestDg = destinationDgStatus === 'loading';
   const isTracing = traceStatus === 'loading';
 
-  // Determine if DG field should be disabled
-  // Disable if loading, allow edit if succeeded, failed, or manual
+  // Disable DG field only when actively fetching that specific DG
   const sourceDgDisabled = isFetchingSourceDg;
   const destDgDisabled = isFetchingDestDg;
 
-  const renderDgStatusIcon = (status) => {
+  const renderDgStatusIcon = (status, type) => {
+    const ip = type === 'source' ? sourceIp : destinationIp;
+    const handleRetry = handleFetchDg(type);
+
     switch (status) {
       case 'loading':
-        return <CircularProgress size={20} />;
+        return <InputAdornment position="end"><CircularProgress size={20} sx={{ mr: 1 }} /></InputAdornment>;
       case 'succeeded':
-        return <Tooltip title="Gateway Fetched"><CheckCircleIcon color="success" /></Tooltip>;
+        return <InputAdornment position="end"><Tooltip title="Gateway automatically fetched"><CheckCircleIcon color="success" sx={{ mr: 1 }} /></Tooltip></InputAdornment>;
       case 'failed':
-        return <Tooltip title="Failed to Fetch Gateway"><SyncProblemIcon color="error" /></Tooltip>;
+        return (
+            <InputAdornment position="end">
+                <Tooltip title="Failed to fetch gateway. Click to retry.">
+                     <IconButton onClick={handleRetry} size="small" disabled={!ip || isTracing} sx={{ mr: 0.5 }}>
+                        <SyncProblemIcon color="error" />
+                    </IconButton>
+                </Tooltip>
+            </InputAdornment>
+        );
       case 'manual':
-         return <Tooltip title="Manually Entered"><EditIcon color="action" /></Tooltip>;
+         return <InputAdornment position="end"><Tooltip title="Gateway manually entered"><EditIcon color="action" sx={{ mr: 1 }} /></Tooltip></InputAdornment>;
       default: // idle
-        return null;
+        return ( // Show refresh button when idle and IP exists
+             ip ? <InputAdornment position="end">
+                 <Tooltip title="Fetch Gateway">
+                     <IconButton onClick={handleRetry} size="small" disabled={isTracing} sx={{ mr: 0.5 }}> <SyncIcon /> </IconButton>
+                 </Tooltip>
+             </InputAdornment> : null
+        );
     }
   };
 
-   // Show DG fetch error specifically
-   const dgError = error && (sourceDgStatus === 'failed' || destinationDgStatus === 'failed');
+  // Check for specific errors
+  const dgFetchError = error && (sourceDgStatus === 'failed' || destinationDgStatus === 'failed');
+  const traceError = error && (traceStatus === 'failed' || traceStatus === 'partial_success') && !dgFetchError;
+
+  const canTrace = sourceIp && destinationIp && sourceDg && destinationDg && !isTracing && !isFetchingSourceDg && !isFetchingDestDg;
 
   return (
-    <Box sx={{ mb: 3 }}>
-        {dgError && <ErrorMessage error={error} title="Gateway Fetch Error" />}
-        <Grid container spacing={2} alignItems="flex-start"> {/* Use alignItems="flex-start" */}
-            {/* Source IP */}
-            <Grid item xs={12} sm={6} md={3}>
+    <Box component="form" noValidate autoComplete="off" onSubmit={(e) => { e.preventDefault(); if(canTrace) handleTrace(); }}>
+        {/* Display DG fetch errors prominently */}
+        {dgFetchError && <ErrorMessage error={error} title="Gateway Fetch Error" />}
+        {/* Display general trace errors separately */}
+        {traceError && <ErrorMessage error={error} title="Trace Error" />}
+
+        {/* Grid v2: No 'item' prop, use direct breakpoint props */}
+        <Grid container spacing={2} alignItems="flex-start">
+            {/* Source Column */}
+            {/* Removed 'item' prop */}
+            <Grid xs={12} md={6}>
+                <Typography variant="subtitle2" gutterBottom sx={{ color: 'primary.main' }}>Source</Typography>
                 <TextField
-                    label="Source IP"
+                    label="Source IP Address"
                     value={sourceIp}
                     onChange={handleInputChange('sourceIp')}
-                    onBlur={handleFetchDg('source')} // Trigger fetch on blur
+                    onBlur={handleFetchDg('source')}
                     variant="outlined"
                     fullWidth
                     required
                     disabled={isTracing}
+                    margin="dense"
+                    error={!!(dgFetchError && sourceDgStatus === 'failed')}
                 />
-            </Grid>
-
-             {/* Source DG */}
-            <Grid item xs={10} sm={5} md={2}>
-                 <TextField
-                    label="Source DG"
+                <TextField
+                    label="Source Default Gateway"
                     value={sourceDg}
                     onChange={handleInputChange('sourceDg')}
                     variant="outlined"
                     fullWidth
                     required
                     disabled={sourceDgDisabled || isTracing}
+                    margin="dense"
                     InputProps={{
-                        endAdornment: renderDgStatusIcon(sourceDgStatus),
+                        endAdornment: renderDgStatusIcon(sourceDgStatus, 'source'),
                     }}
-                 />
-            </Grid>
-            <Grid item xs={2} sm={1} md={1} sx={{display: 'flex', alignItems: 'center', height: '56px' }}> {/* Match TextField height */}
-                 <Tooltip title="Re-fetch Source Gateway">
-                     <span> {/* Span needed for tooltip on disabled button */}
-                        <IconButton onClick={handleFetchDg('source')} disabled={!sourceIp || isFetchingSourceDg || isTracing} size="small">
-                            <SyncIcon />
-                        </IconButton>
-                     </span>
-                 </Tooltip>
+                    error={!!(dgFetchError && sourceDgStatus === 'failed')}
+                    helperText={sourceDgStatus === 'failed' ? "Check IP and network connectivity" : "Enter DG or fetch automatically"}
+                />
             </Grid>
 
-
-            {/* Destination IP */}
-            <Grid item xs={12} sm={6} md={3}>
-                <TextField
-                    label="Destination IP"
+            {/* Destination Column */}
+             {/* Removed 'item' prop */}
+            <Grid xs={12} md={6}>
+                 <Typography variant="subtitle2" gutterBottom sx={{ color: 'secondary.main' }}>Destination</Typography>
+                 <TextField
+                    label="Destination IP Address"
                     value={destinationIp}
                     onChange={handleInputChange('destinationIp')}
-                    onBlur={handleFetchDg('destination')} // Trigger fetch on blur
+                    onBlur={handleFetchDg('destination')}
                     variant="outlined"
                     fullWidth
                     required
                     disabled={isTracing}
+                    margin="dense"
+                    error={!!(dgFetchError && destinationDgStatus === 'failed')}
                  />
-            </Grid>
-
-             {/* Destination DG */}
-            <Grid item xs={10} sm={5} md={2}>
                  <TextField
-                    label="Destination DG"
+                    label="Destination Default Gateway"
                     value={destinationDg}
                     onChange={handleInputChange('destinationDg')}
                     variant="outlined"
                     fullWidth
                     required
                     disabled={destDgDisabled || isTracing}
+                    margin="dense"
                     InputProps={{
-                         endAdornment: renderDgStatusIcon(destinationDgStatus),
+                         endAdornment: renderDgStatusIcon(destinationDgStatus, 'destination'),
                     }}
+                    error={!!(dgFetchError && destinationDgStatus === 'failed')}
+                    helperText={destinationDgStatus === 'failed' ? "Check IP and network connectivity" : "Enter DG or fetch automatically"}
                 />
             </Grid>
-             <Grid item xs={2} sm={1} md={1} sx={{display: 'flex', alignItems: 'center', height: '56px'}}>
-                 <Tooltip title="Re-fetch Destination Gateway">
-                     <span>
-                        <IconButton onClick={handleFetchDg('destination')} disabled={!destinationIp || isFetchingDestDg || isTracing} size="small">
-                            <SyncIcon />
-                        </IconButton>
-                     </span>
-                 </Tooltip>
-            </Grid>
-
-
         </Grid>
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+
+        {/* Trace Button */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 1 }}>
             <Button
                 variant="contained"
                 color="primary"
                 size="large"
                 startIcon={isTracing ? <CircularProgress size={20} color="inherit" /> : <TravelExploreIcon />}
                 onClick={handleTrace}
-                disabled={!sourceIp || !destinationIp || !sourceDg || !destinationDg || isTracing || isFetchingSourceDg || isFetchingDestDg}
+                disabled={!canTrace}
+                type="submit" // Allow form submission via Enter key
             >
-                {isTracing ? 'Tracing...' : 'Trace Route'}
+                {isTracing ? 'Tracing...' : 'Trace Full Route'}
             </Button>
         </Box>
     </Box>
@@ -161,3 +175,4 @@ const RouteInputForm = ({ trace }) => {
 };
 
 export default RouteInputForm;
+// ----- End File: src\components\RouteTrace\RouteInputForm.jsx -----

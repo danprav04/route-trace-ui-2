@@ -1,5 +1,4 @@
-// ----- File: src/store/slices/macTraceSlice.js -----
-
+// ----- File: src\store\slices\macTraceSlice.js -----
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import routeService from '../../services/routeService';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,28 +10,27 @@ const createInitialMacTraceState = () => ({
   dg: '', // Default Gateway
   dgStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed', 'manual'
   traceStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed'
-  traceResult: null, // Will hold the List[DetailedHop] for the MAC trace
-  error: null,
+  traceResult: null, // Holds List[DetailedHop] for the MAC trace
+  error: null, // Holds error message string or object
 });
 
 // --- Async Thunks ---
 
-// Reusable fetch DG logic (or could import from a shared utility if needed)
 export const fetchMacDefaultGateway = createAsyncThunk(
   'macTrace/fetchDefaultGateway',
   async ({ ip, traceId }, { rejectWithValue }) => {
-    if (!ip) return rejectWithValue({ message: "IP address is required.", traceId });
+    if (!ip) return rejectWithValue({ message: "IP address is required to fetch gateway.", traceId });
     try {
       const gateway = await routeService.getDefaultGateway(ip);
-      if (!gateway) throw new Error("No gateway found by backend.");
-      return { gateway, traceId }; // Only need gateway and traceId
+      if (!gateway) throw new Error("No gateway address returned by the backend.");
+      return { gateway, traceId };
     } catch (error) {
-      return rejectWithValue({ message: error.message || 'Failed to fetch DG', traceId });
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to fetch default gateway';
+      return rejectWithValue({ message: errorMessage, traceId });
     }
   }
 );
 
-// Thunk to perform the MAC trace
 export const performMacTrace = createAsyncThunk(
   'macTrace/performMacTrace',
   async ({ traceId, ip, dg }, { rejectWithValue }) => {
@@ -41,9 +39,11 @@ export const performMacTrace = createAsyncThunk(
     }
     try {
       const result = await routeService.getMacTrace(ip, dg);
-      return { traceId, result }; // result is expected List[DetailedHop]
+      // Ensure result is always an array, even if backend returns null/undefined
+      return { traceId, result: result || [] };
     } catch (error) {
-      return rejectWithValue({ message: error.message || 'MAC trace failed', traceId, errorObj: error });
+      const errorMessage = error?.response?.data?.detail || error?.message || 'MAC trace failed';
+      return rejectWithValue({ message: errorMessage, traceId });
     }
   }
 );
@@ -59,7 +59,8 @@ const macTraceSlice = createSlice({
   initialState,
   reducers: {
     addMacTraceSection: (state) => {
-       if (state.traces.length < 5) {
+       const MAX_SECTIONS = 4; // Example limit
+       if (state.traces.length < MAX_SECTIONS) {
          state.traces.push(createInitialMacTraceState());
        }
     },
@@ -71,20 +72,23 @@ const macTraceSlice = createSlice({
     },
     updateMacTraceInput: (state, action) => {
       const { traceId, field, value } = action.payload;
-      const trace = state.traces.find(t => t.id === traceId);
-      if (trace) {
+      const traceIndex = state.traces.findIndex(t => t.id === traceId);
+      if (traceIndex !== -1) {
+        const trace = state.traces[traceIndex];
         trace[field] = value;
-        // Reset status and results when inputs change
+
+        // Reset status and results on input change
         trace.traceStatus = 'idle';
         trace.traceResult = null;
-        trace.error = null;
+        trace.error = null; // Clear general error
 
-        // Mark DG as manually entered if user changes it
-        if (field === 'dg' && trace.dgStatus !== 'loading') trace.dgStatus = 'manual';
-
-        // Reset DG status if IP changes
+        // Handle DG status updates
+        if (field === 'dg' && trace.dgStatus !== 'loading') {
+            trace.dgStatus = 'manual'; // Mark as manual if user types DG
+        }
+        // Reset DG field and status if IP changes
         if (field === 'ip') {
-            trace.dg = ''; // Clear old DG if IP changes
+            trace.dg = '';
             trace.dgStatus = 'idle';
         }
       }
@@ -95,7 +99,7 @@ const macTraceSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Default Gateway Fetching
+      // --- Default Gateway Fetching Reducers ---
       .addCase(fetchMacDefaultGateway.pending, (state, action) => {
         const { traceId } = action.meta.arg;
         const trace = state.traces.find(t => t.id === traceId);
@@ -110,6 +114,10 @@ const macTraceSlice = createSlice({
         if (trace) {
             trace.dg = gateway;
             trace.dgStatus = 'succeeded';
+             // Clear error state if DG fetch was the cause
+             if (trace.error?.includes('Failed to fetch default gateway')) {
+                 trace.error = null;
+             }
         }
       })
       .addCase(fetchMacDefaultGateway.rejected, (state, action) => {
@@ -117,11 +125,12 @@ const macTraceSlice = createSlice({
         const trace = state.traces.find(t => t.id === traceId);
          if (trace) {
           trace.dgStatus = 'failed';
-          trace.error = `DG Fetch Error: ${message}`;
+          trace.error = `Gateway Fetch Error: ${message}`; // Set specific error
+          // trace.traceStatus = 'idle'; // Optional: Reset trace status?
         }
       })
 
-      // MAC Trace Execution
+      // --- MAC Trace Execution Reducers ---
       .addCase(performMacTrace.pending, (state, action) => {
         const { traceId } = action.meta.arg;
         const trace = state.traces.find(t => t.id === traceId);
@@ -145,8 +154,8 @@ const macTraceSlice = createSlice({
         const trace = state.traces.find(t => t.id === traceId);
         if (trace) {
           trace.traceStatus = 'failed';
-          trace.error = message;
-          trace.traceResult = null; // Ensure result is null on failure
+          trace.error = message; // Store the specific trace error
+          trace.traceResult = null; // Ensure result is cleared on failure
         }
       });
   },
@@ -154,5 +163,3 @@ const macTraceSlice = createSlice({
 
 export const { addMacTraceSection, removeMacTraceSection, updateMacTraceInput, resetMacTraceState } = macTraceSlice.actions;
 export default macTraceSlice.reducer;
-
-// ----- End File: src/store/slices/macTraceSlice.js -----

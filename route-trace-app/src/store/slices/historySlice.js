@@ -1,57 +1,69 @@
-// src/store/slices/historySlice.js
+// ----- File: src\store\slices\historySlice.js -----
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import routeService from '../../services/routeService';
 
-// Helper to safely parse JSON
+// Enhanced JSON parsing to handle potential non-JSON strings gracefully
 const safeParseJson = (jsonString, defaultValue = null) => {
-  // Added check for already parsed objects which might happen in some scenarios
+  // If it's already an object (e.g., already parsed), return it directly
   if (typeof jsonString === 'object' && jsonString !== null) return jsonString;
-  if (typeof jsonString !== 'string') return defaultValue; // Return default if not string or object
+  // If it's not a string, return the default value
+  if (typeof jsonString !== 'string' || jsonString.trim() === '') return defaultValue;
+
   try {
-    return JSON.parse(jsonString);
+    const parsed = JSON.parse(jsonString);
+    // Basic check if parsed result is an array (for routeData)
+    // Adjust check if other structures are expected
+    if (Array.isArray(parsed)) {
+        return parsed;
+    } else if (typeof parsed === 'object' && parsed !== null) { // For deviceInfo
+         return parsed;
+    }
+    // If parsed into something unexpected (e.g., a primitive), return default
+    return defaultValue;
   } catch (e) {
-    console.error("Failed to parse JSON:", e, "Input:", jsonString);
-    return defaultValue; // Return default if parsing fails
+    // Log parsing errors for debugging, but don't crash the app
+    console.warn("Failed to parse JSON string:", jsonString, "Error:", e);
+    return defaultValue; // Return default value on parsing failure
   }
 };
+
+// Helper to process raw route entries from the backend
+const processRouteEntry = (route) => ({
+    ...route,
+    // Parse the 'route' field (expected List[DetailedHop] as JSON string)
+    routeData: safeParseJson(route.route, []), // Default to empty array if parsing fails or invalid
+    // Parse the 'device_additional_info' field (expected JSON object string or null)
+    deviceInfo: safeParseJson(route.device_additional_info, null), // Default to null
+    // Ensure user is an object or null
+    user: (typeof route.user === 'object' && route.user !== null) ? route.user : null
+});
 
 // Async thunk for fetching user-specific route history
 export const fetchUserHistory = createAsyncThunk(
   'history/fetchUserHistory',
   async (_, { rejectWithValue }) => {
     try {
-      const routes = await routeService.getUserRoutes();
-      // Backend returns RouteHistoryEntry model
-      // route field is a JSON string of List[DetailedHop]
-      // device_additional_info is optional JSON string
-      return routes.map(r => ({
-        ...r,
-        // Parse the JSON strings into objects/arrays
-        // Ensure routeData becomes an array of hops or null/empty array
-        routeData: safeParseJson(r.route, []), // Default to empty array if parse fails
-        deviceInfo: safeParseJson(r.device_additional_info), // Default to null
-      }));
+      const rawRoutes = await routeService.getUserRoutes();
+      // Process each route entry safely
+      return rawRoutes.map(processRouteEntry);
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to fetch user history');
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to fetch user history';
+      return rejectWithValue(errorMessage);
     }
   }
 );
 
-// Async thunk for fetching all routes (admin)
+// Async thunk for fetching all routes (admin perspective)
 export const fetchAllHistory = createAsyncThunk(
   'history/fetchAllHistory',
   async (_, { rejectWithValue }) => {
     try {
-      const routes = await routeService.getAllRoutes();
-       return routes.map(r => ({
-        ...r,
-        routeData: safeParseJson(r.route, []),
-        deviceInfo: safeParseJson(r.device_additional_info),
-        // Keep user info if backend provides it
-        user: r.user || null
-      }));
+      const rawRoutes = await routeService.getAllRoutes();
+       // Process each route entry safely
+       return rawRoutes.map(processRouteEntry);
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to fetch all routes');
+       const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to fetch all routes history';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -60,45 +72,47 @@ const initialState = {
   userHistory: [],
   allHistory: [],
   userHistoryStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed'
-  allHistoryStatus: 'idle',
-  error: null,
+  allHistoryStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed'
+  error: null, // Holds error message string
 };
 
 const historySlice = createSlice({
   name: 'history',
   initialState,
   reducers: {
+    // Action to explicitly reset any history-related errors
     resetHistoryError: (state) => {
         state.error = null;
     }
+    // Potentially add reducers for clearing history, etc. if needed
   },
   extraReducers: (builder) => {
     builder
-      // User History Fetching
+      // --- User History Fetching ---
       .addCase(fetchUserHistory.pending, (state) => {
         state.userHistoryStatus = 'loading';
-        state.error = null;
+        state.error = null; // Clear previous errors
       })
       .addCase(fetchUserHistory.fulfilled, (state, action) => {
         state.userHistoryStatus = 'succeeded';
-        state.userHistory = action.payload;
+        state.userHistory = action.payload; // Store processed routes
       })
       .addCase(fetchUserHistory.rejected, (state, action) => {
         state.userHistoryStatus = 'failed';
-        state.error = action.payload;
+        state.error = action.payload; // Store error message
       })
-      // All History Fetching
+      // --- All History Fetching ---
       .addCase(fetchAllHistory.pending, (state) => {
         state.allHistoryStatus = 'loading';
-        state.error = null;
+        state.error = null; // Clear previous errors
       })
       .addCase(fetchAllHistory.fulfilled, (state, action) => {
         state.allHistoryStatus = 'succeeded';
-        state.allHistory = action.payload;
+        state.allHistory = action.payload; // Store processed routes
       })
       .addCase(fetchAllHistory.rejected, (state, action) => {
         state.allHistoryStatus = 'failed';
-        state.error = action.payload;
+        state.error = action.payload; // Store error message
       });
   },
 });

@@ -1,94 +1,109 @@
-// ----- File: src/components/RouteTrace/MacTraceVisualizer.jsx -----
-
+// ----- File: src\components\RouteTrace\MacTraceVisualizer.jsx -----
 import React from 'react';
-import { Box, Typography, Stack, Paper } from '@mui/material';
+import { Box, Typography, Stack, Paper, Divider } from '@mui/material';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import ErrorMessage from '../Common/ErrorMessage';
 import HopDisplay from './HopDisplay'; // Reuse HopDisplay
 
 const MacTraceVisualizer = ({ trace }) => {
   const {
-    ip, // Source IP
-    dg, // Destination Gateway
-    traceResult, // Renamed from macTrace in slice to avoid confusion
+    ip, // Endpoint IP
+    dg, // Default Gateway
+    traceResult, // Array of DetailedHop objects
     traceStatus,
     error
   } = trace;
 
-  if (traceStatus === 'loading') {
-    return <LoadingSpinner />;
-  }
+  const isLoading = traceStatus === 'loading';
+  // Separate DG fetch errors from trace errors
+  const isDgError = error && trace.dgStatus === 'failed';
+  const isTraceError = error && traceStatus === 'failed' && !isDgError;
+  const displayError = isTraceError; // Only display trace error here
 
-  const displayError = error && traceStatus === 'failed';
+  const hasResults = traceResult && traceResult.length > 0;
+
+  // Don't render anything in idle state unless there's an error already
+   if (traceStatus === 'idle' && !error) {
+      return null; // Input form shows initial state message
+   }
 
   return (
-    <Paper elevation={0} sx={{ mt: 3, p: { xs: 1, sm: 2 }, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-      <Typography variant="h6" gutterBottom align="center">MAC Trace Results</Typography>
+     <Box sx={{ mt: traceStatus !== 'idle' ? 2 : 0 }}>
+      <Typography variant="h6" gutterBottom align="center" sx={{ mb: 2 }}>
+          MAC Trace Results
+      </Typography>
 
+      {isLoading && <LoadingSpinner message="Performing MAC trace..." />}
+
+      {/* Display specific trace error */}
       {displayError && <ErrorMessage error={error} title="MAC Trace Error" />}
 
-      {/* Display results only if trace has run */}
-      {(traceStatus === 'succeeded' || traceStatus === 'failed') && !displayError && (
-        <Box>
-            {/* Simplified Display: IP <-> DG */}
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                 <Paper elevation={1} sx={{ p: 1, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText', minWidth: '120px' }}>
-                    <Typography variant="overline" sx={{lineHeight: 1.2}}>Endpoint</Typography>
-                    <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{ip || 'N/A'}</Typography>
-                </Paper>
-                <Typography variant="h5">↔</Typography>
-                 <Paper elevation={1} sx={{ p: 1, textAlign: 'center', minWidth: '120px' }}>
-                    <Typography variant="overline" sx={{lineHeight: 1.2}}>Gateway</Typography>
-                    <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{dg || 'N/A'}</Typography>
+      {/* Display results container only if not loading and no specific trace error */}
+      {!isLoading && !displayError && (
+        <Paper elevation={0} variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
+            {/* Header: Endpoint <-> Gateway */}
+            <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                justifyContent="space-around"
+                alignItems="stretch"
+                spacing={2}
+                sx={{ mb: 2, textAlign: 'center' }}
+            >
+                 {/* Endpoint Box */}
+                 <Paper elevation={0} sx={{ p: 1.5, flexGrow: 1, border: 1, borderColor: 'primary.light', borderRadius: 1 }}>
+                    <Typography variant="overline" display="block" sx={{ lineHeight: 1.2, color: 'primary.main' }}>Endpoint</Typography>
+                    <Typography variant="body1" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{ip || 'N/A'}</Typography>
                  </Paper>
-            </Box>
+
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                   <Typography variant="h5" sx={{ color: 'text.secondary', transform: { xs: 'rotate(90deg)', sm: 'none'} }}>↔</Typography>
+                </Box>
+
+                 {/* Gateway Box */}
+                 <Paper elevation={0} sx={{ p: 1.5, flexGrow: 1, border: 1, borderColor: 'grey.400', borderRadius: 1 }}>
+                    <Typography variant="overline" display="block" sx={{ lineHeight: 1.2 }}>Gateway</Typography>
+                    <Typography variant="body1" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{dg || 'N/A'}</Typography>
+                 </Paper>
+            </Stack>
+
+            {/* Divider before hops */}
+            <Divider sx={{ my: 2 }} />
 
           {/* Display Hops */}
-          {traceResult && traceResult.length > 0 ? (
-            <Stack
-              direction="row"
-              spacing={0} // Handled by HopDisplay
-              alignItems="center"
-              sx={{
-                overflowX: 'auto', // Enable horizontal scrolling
-                minWidth: 0, // <<<--- ADD THIS LINE
-                maxWidth: '70vw',
-                py: 2,
-                px: 1,
-                borderTop: '1px dashed',
-                borderBottom: '1px dashed',
-                borderColor: 'divider',
-                my: 2,
-                minHeight: '100px',
-              }}
-            >
-              {traceResult.map((hop, index) => (
-                <HopDisplay
-                  key={`${hop.device_id || hop.ip}-${hop.hop}-${index}`}
-                  hopData={hop}
-                  isFirst={index === 0}
-                  isLast={index === traceResult.length - 1}
-                />
-              ))}
-            </Stack>
+          {hasResults ? (
+             <Box sx={{ overflowX: 'auto', width: '100%', py: 1, px: 0.5 }}>
+                <Stack
+                  direction="row"
+                  spacing={0} // Handled by HopDisplay
+                  alignItems="center"
+                  sx={{
+                    minWidth: 'max-content',
+                    minHeight: 100,
+                    pb: 1,
+                  }}
+                >
+                  {traceResult.map((hop, index) => (
+                    <HopDisplay
+                      key={`${hop.device_id || hop.ip || hop.mac || `hop-${hop.hop}`}-${index}`} // Robust key
+                      hopData={hop}
+                      isFirst={index === 0}
+                      isLast={index === traceResult.length - 1}
+                    />
+                  ))}
+                </Stack>
+             </Box>
           ) : (
-             traceStatus === 'succeeded' && (!traceResult || traceResult.length === 0) && (
-                <Typography align="center" color="text.secondary" sx={{ my: 3 }}>
-                    No MAC trace hops returned.
+             // Show message only if trace succeeded but returned no hops
+             traceStatus === 'succeeded' && (
+                <Typography align="center" color="text.secondary" sx={{ my: 3, fontStyle: 'italic' }}>
+                    No MAC trace hops were returned. The gateway might be directly connected or unreachable at Layer 2.
                 </Typography>
              )
           )}
-        </Box>
+        </Paper>
       )}
-
-      {/* Initial state message */}
-      {traceStatus === 'idle' && !error && (
-        <Typography align="center" color="text.secondary">Enter details and click 'Trace MAC Path' to see results.</Typography>
-      )}
-    </Paper>
+    </Box>
   );
 };
 
 export default MacTraceVisualizer;
-
-// ----- End File: src/components/RouteTrace/MacTraceVisualizer.jsx -----

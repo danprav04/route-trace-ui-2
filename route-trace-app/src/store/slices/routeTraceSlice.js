@@ -1,12 +1,11 @@
-// ----- File: src/store/slices/routeTraceSlice.js -----
-
+// ----- File: src\store\slices\routeTraceSlice.js -----
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import routeService from '../../services/routeService';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from 'uuid'; // Ensure uuid is installed
 
-// Helper to create initial trace state
+// Helper to create the initial state for the single combined trace
 const createInitialTraceState = () => ({
-  id: uuidv4(), // Unique ID for this trace instance
+  id: uuidv4(), // Unique ID for this trace instance/session
   sourceIp: '',
   destinationIp: '',
   sourceDg: '',
@@ -14,103 +13,114 @@ const createInitialTraceState = () => ({
   sourceDgStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed', 'manual'
   destinationDgStatus: 'idle',
   traceStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed', 'partial_success'
-  sourceMacTrace: null, // Expecting format like List[DetailedHop] or null
-  destinationMacTrace: null, // Expecting format like List[DetailedHop] or null
-  mainRouteTrace: null, // Expecting format like List[DetailedHop] or null
-  error: null, // Can store string or object for more details
+  sourceMacTrace: null, // Holds List[DetailedHop] or null
+  destinationMacTrace: null, // Holds List[DetailedHop] or null
+  mainRouteTrace: null, // Holds List[DetailedHop] or null
+  error: null, // Holds error message string or potentially an object with details
 });
 
-// --- Async Thunks (Modified to accept traceId in payload but operate on single state) ---
+// --- Async Thunks ---
 
-// Fetch DG needs traceId in case multiple slices use it, but RouteTrace only has one trace
+// Fetch Default Gateway (Source or Destination)
 export const fetchDefaultGateway = createAsyncThunk(
   'routeTrace/fetchDefaultGateway',
   async ({ ip, type, traceId }, { rejectWithValue, getState }) => {
-    // Ensure the traceId matches the ID in the current state
+    // Check if the action's traceId matches the current state's traceId
     const currentTraceId = getState().routeTrace.trace.id;
     if (traceId !== currentTraceId) {
-         console.warn(`fetchDefaultGateway: Mismatched traceId. State: ${currentTraceId}, Action: ${traceId}. Ignoring action.`);
-         // Don't reject, just ignore if ID doesn't match current state
+         // This prevents updates if the user quickly changes inputs/navigates
+         console.warn(`fetchDefaultGateway: Action traceId ${traceId} does not match current state traceId ${currentTraceId}. Ignoring.`);
          return { ignored: true }; // Signal that the action was ignored
     }
 
-    if (!ip) return rejectWithValue({ message: "IP address is required.", type, traceId });
+    if (!ip) return rejectWithValue({ message: "IP address is required to fetch gateway.", type, traceId });
     try {
       const gateway = await routeService.getDefaultGateway(ip);
-      if (!gateway) throw new Error("No gateway found by backend.");
-      return { gateway, type, traceId }; // Return traceId for consistency
+      if (!gateway) throw new Error("No gateway address returned by the backend.");
+      return { gateway, type, traceId };
     } catch (error) {
-      return rejectWithValue({ message: error.message || 'Failed to fetch DG', type, traceId });
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to fetch default gateway';
+      return rejectWithValue({ message: errorMessage, type, traceId });
     }
   }
 );
 
-// Perform trace needs traceId to ensure action corresponds to current state
+// Perform the Full Combined Trace (Main Route + Both MAC Traces)
 export const performFullTrace = createAsyncThunk(
   'routeTrace/performFullTrace',
   async ({ traceId, sourceIp, destinationIp, sourceDg, destinationDg }, { rejectWithValue, getState }) => {
-    const currentTraceId = getState().routeTrace.trace.id;
-    if (traceId !== currentTraceId) {
-        console.warn(`performFullTrace: Mismatched traceId. State: ${currentTraceId}, Action: ${traceId}. Ignoring action.`);
-        // Don't reject, just ignore
-        return { ignored: true };
-    }
+    // Check if the action's traceId matches the current state's traceId
+     const currentTraceId = getState().routeTrace.trace.id;
+     if (traceId !== currentTraceId) {
+         console.warn(`performFullTrace: Action traceId ${traceId} does not match current state traceId ${currentTraceId}. Ignoring.`);
+         return { ignored: true }; // Signal ignored action
+     }
 
+    // Input validation
     if (!sourceIp || !destinationIp || !sourceDg || !destinationDg) {
         return rejectWithValue({ message: "Source IP, Destination IP, Source DG, and Destination DG are required.", traceId });
     }
     try {
-      // Perform the API calls concurrently
+      // Perform the API calls concurrently for efficiency
       const results = await Promise.allSettled([
-        routeService.getRouteTrace(sourceIp, destinationIp, sourceDg, destinationDg), // Main route first
-        routeService.getMacTrace(sourceIp, sourceDg),
-        routeService.getMacTrace(destinationIp, destinationDg)
+        routeService.getRouteTrace(sourceIp, destinationIp, sourceDg, destinationDg), // Main route
+        routeService.getMacTrace(sourceIp, sourceDg),                             // Source MAC trace
+        routeService.getMacTrace(destinationIp, destinationDg)                       // Destination MAC trace
       ]);
 
       const [mainRouteResult, sourceMacResult, destMacResult] = results;
 
-      // Extract data or null from results
-      const mainRouteTrace = mainRouteResult.status === 'fulfilled' ? mainRouteResult.value : null;
-      const sourceMacTrace = sourceMacResult.status === 'fulfilled' ? sourceMacResult.value : null;
-      const destinationMacTrace = destMacResult.status === 'fulfilled' ? destMacResult.value : null;
+      // Helper to extract value or null, ensuring arrays for trace results
+      const getResultData = (promiseResult) =>
+         promiseResult.status === 'fulfilled' ? (promiseResult.value || []) : null;
 
-      // Collect error messages
+      // Extract data or null from settled promises
+      const mainRouteTrace = getResultData(mainRouteResult);
+      const sourceMacTrace = getResultData(sourceMacResult);
+      const destinationMacTrace = getResultData(destMacResult);
+
+      // Collect detailed error messages if any part failed
       const errors = results
         .filter(p => p.status === 'rejected')
-        .map(p => p.reason?.message || 'Unknown trace component error') // Use optional chaining
-        .join('; ');
+        .map((p, index) => {
+            const component = ['Main Route', 'Source MAC Trace', 'Destination MAC Trace'][index];
+            const reason = p.reason?.response?.data?.detail || p.reason?.message || 'Unknown error';
+            return `${component}: ${reason}`;
+        });
 
-      // Determine overall status
-      let status = 'failed'; // Default to failed
-      if (mainRouteResult.status === 'fulfilled') {
-          status = errors ? 'partial_success' : 'succeeded'; // Success/Partial if main trace worked
+      // Determine overall status based on results
+      let finalStatus;
+      if (mainRouteResult.status === 'rejected') {
+          finalStatus = 'failed'; // Main route failure is a critical failure
+      } else if (errors.length > 0) {
+          finalStatus = 'partial_success'; // Main route succeeded, but MAC trace(s) failed
+      } else {
+          finalStatus = 'succeeded'; // All components succeeded
       }
 
-      if (status === 'failed' && mainRouteResult.status === 'rejected') {
-          // If the main trace failed fundamentally, throw its error to be caught by rejectWithValue
-          throw new Error(errors || mainRouteResult.reason?.message || 'Main trace failed fundamentally');
-      }
-
+      // Return combined results and status
       return {
-        traceId, // Include traceId in the fulfilled payload for matching
+        traceId,
         mainRouteTrace,
         sourceMacTrace,
         destinationMacTrace,
-        status, // 'succeeded' or 'partial_success' or 'failed' (if only mac traces failed)
-        error: errors || null // Report partial errors if any
+        status: finalStatus,
+        // Join multiple errors for display, or return null if no errors
+        error: errors.length > 0 ? errors.join('; ') : null
       };
 
     } catch (error) {
-      // Catches error from the try block (fundamental failure) or rejections if not handled above
-      return rejectWithValue({ message: error.message || 'Full trace operation failed', traceId, errorObj: error });
+      // This catch block handles errors *before* the Promise.allSettled or if something unexpected happens
+      const errorMessage = error?.response?.data?.detail || error?.message || 'Full trace operation failed unexpectedly';
+      return rejectWithValue({ message: errorMessage, traceId });
     }
   }
 );
 
-// --- Slice Definition (Simplified State) ---
+// --- Slice Definition (Manages a single trace state) ---
 
 const initialState = {
-  // Contains only *one* trace state object, not an array
+  // Contains only *one* trace state object
   trace: createInitialTraceState(),
 };
 
@@ -118,60 +128,62 @@ const routeTraceSlice = createSlice({
   name: 'routeTrace',
   initialState,
   reducers: {
-    // REMOVED: addTraceSection, removeTraceSection
-
+    // Update input fields for the single trace
     updateTraceInput: (state, action) => {
       const { traceId, field, value } = action.payload;
-      // Check if the action is for the *current* trace object in state
+      // Ensure the update is for the currently active trace ID
       if (state.trace.id === traceId) {
-          const trace = state.trace; // Direct reference to the single trace object
+          const trace = state.trace; // Direct reference
           trace[field] = value;
-          // Reset status and results when inputs change
+
+          // Reset status and results whenever an input changes
           trace.traceStatus = 'idle';
           trace.mainRouteTrace = null;
           trace.sourceMacTrace = null;
           trace.destinationMacTrace = null;
-          trace.error = null;
+          trace.error = null; // Clear general error
 
-          // Mark DG as manually entered if user changes it after auto-fetch/fail
-          if (field === 'sourceDg' && trace.sourceDgStatus !== 'loading') trace.sourceDgStatus = 'manual';
-          if (field === 'destinationDg' && trace.destinationDgStatus !== 'loading') trace.destinationDgStatus = 'manual';
-
-          // Reset DG status if IP changes
+          // Handle DG status logic
+          if (field === 'sourceDg' && trace.sourceDgStatus !== 'loading') {
+              trace.sourceDgStatus = 'manual';
+          }
+          if (field === 'destinationDg' && trace.destinationDgStatus !== 'loading') {
+              trace.destinationDgStatus = 'manual';
+          }
           if (field === 'sourceIp') {
-              trace.sourceDg = ''; // Clear old DG if source IP changes
+              trace.sourceDg = '';
               trace.sourceDgStatus = 'idle';
           }
           if (field === 'destinationIp') {
-              trace.destinationDg = ''; // Clear old DG if destination IP changes
+              trace.destinationDg = '';
               trace.destinationDgStatus = 'idle';
           }
       } else {
-          console.warn(`updateTraceInput: Mismatched traceId. State: ${state.trace.id}, Action: ${traceId}. Ignoring update.`);
+           console.warn(`updateTraceInput: Mismatched traceId. State: ${state.trace.id}, Action: ${traceId}. Ignoring update.`);
       }
     },
+    // Reset the entire trace state to its initial empty state
     resetTraceState: (state) => {
-        // Replace the existing trace object with a new initial one
         state.trace = createInitialTraceState();
     }
+    // Removed addTraceSection and removeTraceSection as this slice handles a single trace
   },
   extraReducers: (builder) => {
     builder
-      // Default Gateway Fetching
+      // --- Default Gateway Fetching Reducers ---
       .addCase(fetchDefaultGateway.pending, (state, action) => {
         const { type, traceId } = action.meta.arg;
-        // Only update state if the pending action matches the current trace ID
-        if (state.trace.id === traceId) {
+        if (state.trace.id === traceId) { // Check ID match
           if (type === 'source') state.trace.sourceDgStatus = 'loading';
           if (type === 'destination') state.trace.destinationDgStatus = 'loading';
-          state.trace.error = null; // Clear previous DG errors
+          state.trace.error = null; // Clear previous errors
         }
       })
       .addCase(fetchDefaultGateway.fulfilled, (state, action) => {
-         if (action.payload.ignored) return; // Do nothing if action was ignored
+         // Ignore if the action was signaled as ignored
+         if (action.payload.ignored) return;
         const { gateway, type, traceId } = action.payload;
-        // Only update state if the fulfilled action matches the current trace ID
-        if (state.trace.id === traceId) {
+        if (state.trace.id === traceId) { // Check ID match
           if (type === 'source') {
             state.trace.sourceDg = gateway;
             state.trace.sourceDgStatus = 'succeeded';
@@ -180,57 +192,53 @@ const routeTraceSlice = createSlice({
             state.trace.destinationDg = gateway;
             state.trace.destinationDgStatus = 'succeeded';
           }
-           // Clear general error if DG fetch succeeds (might overwrite a previous trace error)
-           state.trace.error = null;
+           // Clear error state if DG fetch was the cause
+           if (state.trace.error?.includes('Failed to fetch default gateway')) {
+               state.trace.error = null;
+           }
         }
       })
       .addCase(fetchDefaultGateway.rejected, (state, action) => {
-        if (action.payload.ignored) return; // Do nothing if action was ignored
+        if (action.payload.ignored) return; // Ignore if signaled
         const { message, type, traceId } = action.payload;
-        // Only update state if the rejected action matches the current trace ID
-        if (state.trace.id === traceId) {
+        if (state.trace.id === traceId) { // Check ID match
           if (type === 'source') state.trace.sourceDgStatus = 'failed';
           if (type === 'destination') state.trace.destinationDgStatus = 'failed';
-          // Set the error specifically for DG failure
-          state.trace.error = `DG Fetch Error (${type}): ${message}`;
-          // Reset trace status if a DG fetch fails while trace was in progress/success
-          state.trace.traceStatus = 'idle';
+          state.trace.error = `Gateway Fetch Error (${type}): ${message}`; // Set specific error
+          // state.trace.traceStatus = 'idle'; // Optional: Reset trace status on DG fail?
         }
       })
 
-      // Full Trace Execution
+      // --- Full Trace Execution Reducers ---
       .addCase(performFullTrace.pending, (state, action) => {
         const { traceId } = action.meta.arg;
-        // Only update state if the pending action matches the current trace ID
-        if (state.trace.id === traceId) {
+        if (state.trace.id === traceId) { // Check ID match
           state.trace.traceStatus = 'loading';
           state.trace.error = null;
-          // Clear previous results while loading new ones
+          // Clear previous results
           state.trace.mainRouteTrace = null;
           state.trace.sourceMacTrace = null;
           state.trace.destinationMacTrace = null;
         }
       })
       .addCase(performFullTrace.fulfilled, (state, action) => {
-         if (action.payload.ignored) return; // Do nothing if action was ignored
+         if (action.payload.ignored) return; // Ignore if signaled
         const { traceId, mainRouteTrace, sourceMacTrace, destinationMacTrace, status, error } = action.payload;
-        // Only update state if the fulfilled action matches the current trace ID
-        if (state.trace.id === traceId) {
-          state.trace.traceStatus = status; // 'succeeded' or 'partial_success' or 'failed'
+        if (state.trace.id === traceId) { // Check ID match
+          state.trace.traceStatus = status; // 'succeeded', 'partial_success', or 'failed'
           state.trace.mainRouteTrace = mainRouteTrace;
           state.trace.sourceMacTrace = sourceMacTrace;
           state.trace.destinationMacTrace = destinationMacTrace;
-          state.trace.error = error; // Store any partial errors reported
+          state.trace.error = error; // Store combined errors message or null
         }
       })
       .addCase(performFullTrace.rejected, (state, action) => {
-        if (action.payload.ignored) return; // Do nothing if action was ignored
+        if (action.payload.ignored) return; // Ignore if signaled
         const { message, traceId } = action.payload;
-        // Only update state if the rejected action matches the current trace ID
-        if (state.trace.id === traceId) {
+        if (state.trace.id === traceId) { // Check ID match
           state.trace.traceStatus = 'failed';
-          state.trace.error = message; // Store the main error message
-           // Ensure results are explicitly null on failure
+          state.trace.error = message; // Store the primary error message
+           // Explicitly clear results on fundamental failure
            state.trace.mainRouteTrace = null;
            state.trace.sourceMacTrace = null;
            state.trace.destinationMacTrace = null;
@@ -239,8 +247,6 @@ const routeTraceSlice = createSlice({
   },
 });
 
-// Export only the relevant actions
+// Export only the relevant actions for a single trace state
 export const { updateTraceInput, resetTraceState } = routeTraceSlice.actions;
 export default routeTraceSlice.reducer;
-
-// ----- End File: src/store/slices/routeTraceSlice.js -----
