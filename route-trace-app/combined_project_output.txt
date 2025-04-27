@@ -14,6 +14,10 @@ route-trace-app/
 │   │   │   ├── LoadingSpinner.jsx
 │   │   │   ├── Navbar.jsx
 │   │   │   └── Sidebar.jsx
+│   │   ├── Comparison
+│   │   │   ├── ComparisonItem.jsx
+│   │   │   ├── ComparisonSelector.jsx
+│   │   │   └── HistoryRouteVisualizer.jsx
 │   │   ├── History
 │   │   │   ├── HistoryItem.jsx
 │   │   │   └── HistoryList.jsx
@@ -34,6 +38,7 @@ route-trace-app/
 │   │   └── useAuth.js
 │   ├── pages
 │   │   ├── AllRoutesPage.jsx
+│   │   ├── ComparisonPage.jsx
 │   │   ├── DirectRouteTracePage.jsx
 │   │   ├── HistoryPage.jsx
 │   │   ├── LoginPage.jsx
@@ -468,8 +473,6 @@ main();
 
 // ----- File: public\index.html -----
 
-// ----- File: public/index.html -----
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -511,8 +514,6 @@ main();
     <div id="root"></div>
   </body>
 </html>
-
-// ----- End File: public/index.html -----
 
 // ----- End File: public\index.html -----
 
@@ -615,29 +616,28 @@ import {
     IconButton,
     Typography,
     Container,
-    createTheme // Need createTheme if not directly using the function result
+    createTheme
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import LoginPage from './pages/LoginPage';
 import RouteTracePage from './pages/RouteTracePage'; // Combined Trace
-import MacTracePage from './pages/MacTracePage'; // New MAC Trace
-import DirectRouteTracePage from './pages/DirectRouteTracePage'; // New Direct Route Trace
+import MacTracePage from './pages/MacTracePage'; // MAC Trace
+import DirectRouteTracePage from './pages/DirectRouteTracePage'; // Direct Route Trace
 import HistoryPage from './pages/HistoryPage';
 import AllRoutesPage from './pages/AllRoutesPage';
+import ComparisonPage from './pages/ComparisonPage'; // <-- Import the new Comparison Page
 import NotFoundPage from './pages/NotFoundPage';
-import Sidebar from './components/Common/Sidebar'; // Import the new Sidebar
+import Sidebar from './components/Common/Sidebar';
 import { useAuth } from './hooks/useAuth';
-import getDesignTokens from './theme'; // Import theme config function
+import getDesignTokens from './theme';
 
-const drawerWidth = 240; // Define drawer width here
+const drawerWidth = 240;
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
 
   if (!isAuthenticated) {
-    // Redirect them to the /login page, but save the current location they were
-    // trying to go to. This allows us to send them back after login.
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -647,9 +647,7 @@ function ProtectedRoute({ children }) {
 function App() {
   const { isAuthenticated } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  // State to manage theme mode. Could use localStorage for persistence.
   const [mode, setMode] = useState(() => {
-      // Example: Read initial mode from localStorage or default to 'light'
       const savedMode = localStorage.getItem('themeMode');
       return savedMode === 'dark' ? 'dark' : 'light';
   });
@@ -658,13 +656,11 @@ function App() {
     setMobileOpen(!mobileOpen);
   };
 
-  // Theme switching logic
   const colorMode = useMemo(
     () => ({
       toggleColorMode: () => {
         setMode((prevMode) => {
           const newMode = prevMode === 'light' ? 'dark' : 'light';
-          // Example: Persist mode to localStorage
           localStorage.setItem('themeMode', newMode);
           return newMode;
         });
@@ -673,15 +669,13 @@ function App() {
     [],
   );
 
-  // Create the theme based on the current mode
   const theme = useMemo(() => createTheme(getDesignTokens(mode)), [mode]);
 
   return (
     <ThemeProvider theme={theme}>
-      <CssBaseline /> {/* Apply baseline styles & background based on theme */}
+      <CssBaseline />
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
 
-        {/* Render Sidebar only if authenticated */}
         {isAuthenticated && (
           <Sidebar
             drawerWidth={drawerWidth}
@@ -692,23 +686,23 @@ function App() {
           />
         )}
 
-        {/* Main content area */}
         <Box
           component="main"
           sx={{
             flexGrow: 1,
             pt: isAuthenticated ? `calc(${theme.mixins.toolbar.minHeight}px + ${theme.spacing(3)})` : theme.spacing(3),
-            pb: 3, // Bottom padding
-            px: 3, // Horizontal padding
+            pb: 3,
+            px: 3,
             width: isAuthenticated ? { md: `calc(100% - ${drawerWidth}px)` } : '100%',
             ml: isAuthenticated ? { md: `${drawerWidth}px` } : 0,
             transition: theme.transitions.create(['margin', 'width'], {
                  easing: theme.transitions.easing.sharp,
                  duration: theme.transitions.duration.leavingScreen,
             }),
+            // Ensure main content area can scroll if needed
+            overflowY: 'auto',
           }}
         >
-           {/* AppBar for mobile toggle and title */}
            {isAuthenticated && (
                 <AppBar
                     position="fixed"
@@ -730,7 +724,7 @@ function App() {
                             <MenuIcon />
                         </IconButton>
                         <Typography variant="h6" noWrap component="div">
-                            RouteTrace {/* Title can be dynamic */}
+                            RouteTrace
                         </Typography>
                     </Toolbar>
                 </AppBar>
@@ -739,7 +733,7 @@ function App() {
              <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route
-                    path="/" // Combined Trace (Original)
+                    path="/" // Combined Trace
                     element={
                     <ProtectedRoute>
                         <RouteTracePage />
@@ -747,7 +741,7 @@ function App() {
                     }
                 />
                  <Route
-                    path="/mac-trace" // New MAC Trace
+                    path="/mac-trace" // MAC Trace
                     element={
                     <ProtectedRoute>
                         <MacTracePage />
@@ -755,10 +749,19 @@ function App() {
                     }
                 />
                  <Route
-                    path="/direct-route-trace" // New Direct Route Trace
+                    path="/direct-route-trace" // Direct Route Trace
                     element={
                     <ProtectedRoute>
                         <DirectRouteTracePage />
+                    </ProtectedRoute>
+                    }
+                />
+                {/* Add the new Comparison Page route */}
+                 <Route
+                    path="/comparison"
+                    element={
+                    <ProtectedRoute>
+                        <ComparisonPage />
                     </ProtectedRoute>
                     }
                 />
@@ -1023,25 +1026,16 @@ import React from 'react';
 import { useDispatch } from 'react-redux';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-    Drawer,
-    Box,
-    List,
-    ListItem,
-    ListItemButton,
-    ListItemIcon,
-    ListItemText,
-    Toolbar,
-    Divider,
-    Typography,
-    IconButton,
-    Tooltip
+    Drawer, Box, List, ListItem, ListItemButton, ListItemIcon,
+    ListItemText, Toolbar, Divider, Typography, IconButton, Tooltip
 } from '@mui/material';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import RouteIcon from '@mui/icons-material/Route'; // For Combined Trace Route
-import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // For MAC Trace
-import NetworkCheckIcon from '@mui/icons-material/NetworkCheck'; // For Direct Route Trace
-import HistoryIcon from '@mui/icons-material/History'; // For My History
-import PeopleIcon from '@mui/icons-material/People'; // For All Routes
+import RouteIcon from '@mui/icons-material/Route'; // Combined Trace
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // MAC Trace
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck'; // Direct Route Trace
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows'; // <-- Icon for Comparison Page
+import HistoryIcon from '@mui/icons-material/History'; // My History
+import PeopleIcon from '@mui/icons-material/People'; // All Routes
 import LogoutIcon from '@mui/icons-material/Logout';
 import Brightness4Icon from '@mui/icons-material/Brightness4'; // Dark mode
 import Brightness7Icon from '@mui/icons-material/Brightness7'; // Light mode
@@ -1052,25 +1046,25 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const location = useLocation();
-    const { user } = useAuth(); // Get user info if needed
+    const { user } = useAuth();
 
     const handleLogout = () => {
         dispatch(logoutUser());
-        navigate('/login'); // Redirect to login after logout
+        navigate('/login');
     };
 
-    // Updated Menu Items
+    // Updated Menu Items including Comparison
     const menuItems = [
         { text: 'Combined Trace', icon: <RouteIcon />, path: '/' },
         { text: 'Direct Route Trace', icon: <NetworkCheckIcon />, path: '/direct-route-trace' },
         { text: 'MAC Trace', icon: <SettingsEthernetIcon />, path: '/mac-trace' },
+        { text: 'Compare Traces', icon: <CompareArrowsIcon />, path: '/comparison' }, // <-- New Comparison Link
         { text: 'My History', icon: <HistoryIcon />, path: '/history' },
         { text: 'All Routes', icon: <PeopleIcon />, path: '/all-routes' },
     ];
 
     const drawerContent = (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* App Logo/Title Area */}
             <Toolbar sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                 <AccountTreeIcon fontSize="large" color="primary" />
                 <Typography variant="h6" noWrap component="div" color="primary">
@@ -1078,8 +1072,6 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
                 </Typography>
             </Toolbar>
             <Divider />
-
-            {/* Navigation Links */}
             <List sx={{ flexGrow: 1 }}>
                 {menuItems.map((item) => (
                     <ListItem key={item.text} disablePadding>
@@ -1095,8 +1087,6 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
                     </ListItem>
                 ))}
             </List>
-
-            {/* Bottom Section: Theme Toggle & Logout */}
             <Divider />
             <List>
                  <ListItem disablePadding>
@@ -1125,14 +1115,11 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
             sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
             aria-label="mailbox folders"
         >
-            {/* Temporary Drawer for Mobile */}
             <Drawer
                 variant="temporary"
                 open={mobileOpen}
                 onClose={handleDrawerToggle}
-                ModalProps={{
-                    keepMounted: true, // Better open performance on mobile.
-                }}
+                ModalProps={{ keepMounted: true }}
                 sx={{
                     display: { xs: 'block', md: 'none' },
                     '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
@@ -1140,15 +1127,13 @@ const Sidebar = ({ drawerWidth, mobileOpen, handleDrawerToggle, mode, toggleColo
             >
                 {drawerContent}
             </Drawer>
-
-            {/* Permanent Drawer for Desktop */}
             <Drawer
                 variant="permanent"
                 sx={{
                     display: { xs: 'none', md: 'block' },
                     '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
                 }}
-                open // Permanent drawer is always conceptually 'open'
+                open
             >
                 {drawerContent}
             </Drawer>
@@ -1161,6 +1146,267 @@ export default Sidebar;
 // ----- End File: src/components/Common/Sidebar.jsx -----
 
 // ----- End File: src\components\Common\Sidebar.jsx -----
+
+// ----- File: src\components\Comparison\ComparisonItem.jsx -----
+
+// ----- File: src/components/Comparison/ComparisonItem.jsx -----
+
+import React from 'react';
+import { Paper, Box, IconButton, Tooltip, Typography } from '@mui/material';
+import HistoryRouteVisualizer from './HistoryRouteVisualizer';
+// import CloseIcon from '@mui/icons-material/Close'; // Removing close button for now, handled by selector
+
+// This component acts as a wrapper for HistoryRouteVisualizer
+// to fit into the structure expected by RouteComparisonContainer.
+// RouteComparisonContainer passes 'trace' and 'canRemove'.
+// We adapt the 'route' prop from ComparisonPage to the 'trace' prop name.
+const ComparisonItem = ({ trace: route }) => {
+    // The 'canRemove' prop from RouteComparisonContainer might not be directly used here.
+    // Removal is handled by the ComparisonSelector.
+
+    if (!route) return null;
+
+    return (
+        // We use Paper similar to other Section components for consistency
+        <Paper elevation={2} sx={{ p: 2, mb: 3, position: 'relative', height: '100%' }}>
+            {/* Optional: Add a header specific to the comparison item */}
+            {/* <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, borderBottom: 1, borderColor: 'divider', pb:1 }}>
+                <Typography variant="subtitle1">Trace ID: {route.id}</Typography> */}
+                {/* Add remove button here if needed, linking back to ComparisonPage state */}
+            {/* </Box> */}
+
+            <HistoryRouteVisualizer route={route} />
+        </Paper>
+    );
+};
+
+export default ComparisonItem;
+
+// ----- End File: src/components/Comparison/ComparisonItem.jsx -----
+
+// ----- End File: src\components\Comparison\ComparisonItem.jsx -----
+
+// ----- File: src\components\Comparison\ComparisonSelector.jsx -----
+
+// ----- File: src/components/Comparison/ComparisonSelector.jsx -----
+
+import React from 'react';
+import { Autocomplete, TextField, Checkbox, Box, Typography, Chip } from '@mui/material';
+import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
+import CheckBoxIcon from '@mui/icons-material/CheckBox';
+import { formatTimestamp } from '../../utils/formatters';
+
+const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
+const checkedIcon = <CheckBoxIcon fontSize="small" />;
+
+const ComparisonSelector = ({ availableRoutes, selectedIds, onChange }) => {
+
+    // Find the route objects corresponding to the selected IDs
+    const selectedRoutes = availableRoutes.filter(route => selectedIds.includes(route.id));
+
+    // --- FIX: Create a copy before sorting ---
+    // Use the spread syntax (...) to create a shallow copy of the array
+    const sortedOptions = [...availableRoutes].sort((a, b) => {
+        // Robust date comparison
+        const dateA = a.timestamp ? new Date(a.timestamp) : 0;
+        const dateB = b.timestamp ? new Date(b.timestamp) : 0;
+        // Ensure valid dates are compared; handle potential invalid dates gracefully
+        if (isNaN(dateA) && isNaN(dateB)) return 0;
+        if (isNaN(dateA)) return 1; // Put invalid dates last
+        if (isNaN(dateB)) return -1; // Put invalid dates last
+        return dateB - dateA; // Sort newest first
+    });
+    // --- End FIX ---
+
+    const getOptionLabel = (option) => {
+        // Generate a descriptive label for each route in the dropdown
+        const user = option.user ? `User: ${option.user.username}` : 'N/A';
+        const time = formatTimestamp(option.timestamp, 'MMM d, HH:mm');
+        return `${option.source || 'N/A'} → ${option.destination || 'N/A'} (${time}, ${user}, ID: ${option.id})`;
+    };
+
+    const handleChange = (event, newValue) => {
+        // Extract just the IDs from the selected route objects
+        const newSelectedIds = newValue.map(route => route.id);
+        onChange(newSelectedIds);
+    };
+
+    return (
+        <Box sx={{ mb: 2 }}>
+            <Typography variant="h6" gutterBottom>Select Routes to Compare</Typography>
+            <Autocomplete
+                multiple
+                id="route-comparison-selector"
+                options={sortedOptions} // <-- Use the sorted COPY
+                disableCloseOnSelect
+                value={selectedRoutes} // Pass the selected route *objects* to Autocomplete
+                getOptionLabel={getOptionLabel} // Function to display each option
+                isOptionEqualToValue={(option, value) => option.id === value.id} // How to compare options
+                onChange={handleChange} // Handle changes
+                renderOption={(props, option, { selected }) => (
+                    // Ensure the key is unique and stable if possible, using option.id
+                    <li {...props} key={option.id} style={{ display: 'flex', alignItems: 'center' }}>
+                        <Checkbox
+                            icon={icon}
+                            checkedIcon={checkedIcon}
+                            style={{ marginRight: 8 }}
+                            checked={selected}
+                            // Add aria-labelledby or similar for accessibility if needed
+                        />
+                        <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+                             {/* Main route identifier */}
+                             <Typography variant="body2" sx={{ wordBreak: 'break-word', lineHeight: 1.3 }}>
+                                <Chip label="Src" size="small" color="primary" sx={{ mr: 0.5, height: '18px', verticalAlign: 'middle' }} />
+                                <Typography component="span" sx={{ fontWeight: 'medium', verticalAlign: 'middle' }}>{option.source || 'N/A'}</Typography>
+                                <Typography component="span" sx={{ mx: 1, verticalAlign: 'middle' }}>→</Typography>
+                                <Chip label="Dst" size="small" color="secondary" sx={{ mr: 0.5, height: '18px', verticalAlign: 'middle' }} />
+                                <Typography component="span" sx={{ fontWeight: 'medium', verticalAlign: 'middle' }}>{option.destination || 'N/A'}</Typography>
+                             </Typography>
+                             {/* Secondary details: Timestamp, User, ID */}
+                             <Typography variant="caption" color="text.secondary">
+                                {formatTimestamp(option.timestamp)} {option.user ? `(${option.user.username})` : ''} (ID: {option.id})
+                             </Typography>
+                        </Box>
+                    </li>
+                )}
+                renderInput={(params) => (
+                    <TextField
+                        {...params}
+                        variant="outlined"
+                        label="Search and Select Historical Traces"
+                        placeholder="Select Routes..."
+                        // InputLabelProps={{ shrink: true }} // Optional: always show label shrunk
+                    />
+                )}
+                sx={{ width: '100%' }} // Make it full width
+            />
+        </Box>
+    );
+};
+
+export default ComparisonSelector;
+
+// ----- End File: src/components/Comparison/ComparisonSelector.jsx -----
+
+// ----- End File: src\components\Comparison\ComparisonSelector.jsx -----
+
+// ----- File: src\components\Comparison\HistoryRouteVisualizer.jsx -----
+
+// ----- File: src/components/Comparison/HistoryRouteVisualizer.jsx -----
+
+import React from 'react';
+import { Box, Typography, Stack, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Divider } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import InfoIcon from '@mui/icons-material/Info';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import DeviceUnknownIcon from '@mui/icons-material/DeviceUnknown';
+import HopDisplay from '../RouteTrace/HopDisplay'; // Reuse the hop display component
+import { formatTimestamp } from '../../utils/formatters';
+
+const HistoryRouteVisualizer = ({ route }) => {
+    const { id, source, destination, timestamp, routeData, deviceInfo, user } = route;
+
+    // Check if routeData is valid (should be an array from historySlice parsing)
+    const hasValidRouteData = Array.isArray(routeData) && routeData.length > 0;
+    const hasDeviceInfo = deviceInfo && typeof deviceInfo === 'object' && Object.keys(deviceInfo).length > 0;
+
+    return (
+        <Box>
+            {/* Header Info */}
+            <Paper elevation={0} sx={{ p: 1, mb: 2, border: 1, borderColor: 'divider' }}>
+                 <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} flexWrap="wrap">
+                    <Box>
+                        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
+                            <Chip label="Src" size="small" color="primary" sx={{ mr: 0.5}} />
+                            <Typography component="span" sx={{wordBreak: 'break-all'}}>{source || 'N/A'}</Typography>
+                            <Typography component="span" sx={{ mx: 1 }}>→</Typography>
+                            <Chip label="Dst" size="small" color="secondary" sx={{ mr: 0.5}} />
+                            <Typography component="span" sx={{wordBreak: 'break-all'}}>{destination || 'N/A'}</Typography>
+                        </Typography>
+                    </Box>
+                     <Stack direction="column" alignItems={'flex-end'} sx={{ minWidth: '120px' }}>
+                         {user && <Typography variant="caption" color="text.secondary">User: {user.username}</Typography>}
+                         <Typography variant="caption" color="text.secondary">{formatTimestamp(timestamp)}</Typography>
+                         <Typography variant="caption" color="text.secondary" sx={{fontSize: '0.65rem'}}>(ID: {id})</Typography>
+                    </Stack>
+                </Stack>
+            </Paper>
+
+            {/* Device Info Accordion (if available) */}
+            {hasDeviceInfo && (
+                 <Accordion elevation={1} sx={{mb: 1}} TransitionProps={{ unmountOnExit: true }}>
+                     <AccordionSummary
+                        expandIcon={<ExpandMoreIcon />}
+                        aria-controls={`panel-deviceinfo-${id}-content`}
+                        id={`panel-deviceinfo-${id}-header`}
+                        sx={{minHeight: '36px', '&.Mui-expanded': { minHeight: '36px' }}}
+                     >
+                         <DeviceUnknownIcon sx={{mr: 1, color: 'action.active', fontSize: '1.1rem'}}/>
+                         <Typography variant="caption">Additional Device Info</Typography>
+                     </AccordionSummary>
+                     <AccordionDetails sx={{bgcolor: 'action.hover', p: 1}}>
+                         <pre style={{fontSize: '0.75rem', margin: 0, padding: '5px', borderRadius: '4px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all'}}>
+                             {JSON.stringify(deviceInfo, null, 2)}
+                         </pre>
+                     </AccordionDetails>
+                 </Accordion>
+            )}
+
+            {/* Route Trace Accordion */}
+            <Accordion defaultExpanded elevation={1} TransitionProps={{ unmountOnExit: true }}>
+                 <AccordionSummary
+                    expandIcon={<ExpandMoreIcon />}
+                    aria-controls={`panel-routedata-${id}-content`}
+                    id={`panel-routedata-${id}-header`}
+                     sx={{minHeight: '48px', '&.Mui-expanded': { minHeight: '48px' }}}
+                 >
+                     <AccountTreeIcon sx={{mr: 1, color: 'action.active'}} />
+                     <Typography variant="subtitle2">Detailed Hops ({routeData?.length ?? 0})</Typography>
+                 </AccordionSummary>
+                 <AccordionDetails sx={{ p: 1 }}>
+                    {hasValidRouteData ? (
+                        <Stack
+                            direction="row"
+                            spacing={0}
+                            alignItems="center"
+                            sx={{
+                                overflowX: 'auto',
+                                minWidth: 0,
+                                maxWidth: '100%', // Adjust based on container
+                                py: 1,
+                                px: 1,
+                                border: '1px dashed',
+                                borderColor: 'divider',
+                                borderRadius: 1,
+                                minHeight: '90px',
+                            }}
+                        >
+                            {routeData.map((hop, index) => (
+                                <HopDisplay
+                                    key={`${hop.device_id || hop.ip}-${hop.hop}-${index}`}
+                                    hopData={hop}
+                                    isFirst={index === 0}
+                                    isLast={index === routeData.length - 1}
+                                />
+                            ))}
+                        </Stack>
+                    ) : (
+                        <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
+                            No detailed route hops available in this history entry.
+                        </Typography>
+                    )}
+                </AccordionDetails>
+            </Accordion>
+
+
+        </Box>
+    );
+};
+
+export default HistoryRouteVisualizer;
+// ----- End File: src/components/Comparison/HistoryRouteVisualizer.jsx -----
+
+// ----- End File: src\components\Comparison\HistoryRouteVisualizer.jsx -----
 
 // ----- File: src\components\History\HistoryItem.jsx -----
 
@@ -2700,6 +2946,86 @@ export default AllRoutesPage;
 
 // ----- End File: src\pages\AllRoutesPage.jsx -----
 
+// ----- File: src\pages\ComparisonPage.jsx -----
+
+// ----- File: src/pages/ComparisonPage.jsx -----
+
+import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { Box, Typography, Alert } from '@mui/material';
+import ComparisonSelector from '../components/Comparison/ComparisonSelector';
+import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
+import ComparisonItem from '../components/Comparison/ComparisonItem';
+import LoadingSpinner from '../components/Common/LoadingSpinner';
+import ErrorMessage from '../components/Common/ErrorMessage';
+import { fetchAllHistory, resetHistoryError } from '../store/slices/historySlice';
+
+const ComparisonPage = () => {
+    const dispatch = useDispatch();
+    const { allHistory, allHistoryStatus, error: historyError } = useSelector((state) => state.history);
+    const [selectedRouteIds, setSelectedRouteIds] = useState([]);
+
+    // Fetch all history if not already loaded
+    useEffect(() => {
+        if (allHistoryStatus === 'idle') {
+            dispatch(fetchAllHistory());
+        }
+        // Clear errors on unmount
+        return () => {
+            dispatch(resetHistoryError());
+        };
+    }, [allHistoryStatus, dispatch]);
+
+    const handleSelectionChange = (selectedIds) => {
+        setSelectedRouteIds(selectedIds);
+    };
+
+    // Filter the full history data based on selected IDs
+    const selectedRoutesData = allHistory.filter(route => selectedRouteIds.includes(route.id));
+
+    return (
+        <Box>
+            <Typography variant="h4" component="h1" gutterBottom>
+                Compare Historical Traces
+            </Typography>
+
+            {allHistoryStatus === 'loading' && <LoadingSpinner />}
+            {allHistoryStatus === 'failed' && <ErrorMessage error={historyError} title="Could not load route history" />}
+
+            {allHistoryStatus === 'succeeded' && (
+                <Box>
+                    <ComparisonSelector
+                        availableRoutes={allHistory}
+                        selectedIds={selectedRouteIds}
+                        onChange={handleSelectionChange}
+                    />
+
+                    {selectedRoutesData.length > 0 ? (
+                         // Use RouteComparisonContainer, passing the selected *historical* routes
+                         // and the ComparisonItem component to render each one.
+                        <Box sx={{mt: 3}}>
+                             <RouteComparisonContainer
+                                traces={selectedRoutesData} // Pass historical data
+                                SectionComponent={ComparisonItem} // Use the specific component for historical items
+                             />
+                        </Box>
+                    ) : (
+                        <Alert severity="info" sx={{ mt: 3 }}>
+                            Select two or more routes from the history list above to compare them side-by-side.
+                        </Alert>
+                    )}
+                </Box>
+            )}
+        </Box>
+    );
+};
+
+export default ComparisonPage;
+
+// ----- End File: src/pages/ComparisonPage.jsx -----
+
+// ----- End File: src\pages\ComparisonPage.jsx -----
+
 // ----- File: src\pages\DirectRouteTracePage.jsx -----
 
 // ----- File: src/pages/DirectRouteTracePage.jsx -----
@@ -2883,43 +3209,40 @@ export default NotFoundPage;
 // ----- File: src/pages/RouteTracePage.jsx -----
 
 import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { Button, Box, Typography } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
-import RouteTraceSection from '../components/RouteTrace/RouteTraceSection'; // Import the specific section for this page
-import { addTraceSection } from '../store/slices/routeTraceSlice'; // Use the correct slice action for this page
+import { useSelector } from 'react-redux';
+import { Box, Typography, Paper } from '@mui/material';
+// Remove Button, AddIcon, RouteComparisonContainer, RouteTraceSection imports
+import RouteInputForm from '../components/RouteTrace/RouteInputForm'; // Import the form
+import RouteVisualizer from '../components/RouteTrace/RouteVisualizer'; // Import the visualizer
 
 const RouteTracePage = () => {
-    const dispatch = useDispatch();
-    // Select state from the original routeTrace slice
-    const traces = useSelector((state) => state.routeTrace.traces);
+    // Select the single trace state object directly
+    const trace = useSelector((state) => state.routeTrace.trace); // Access the single trace state
 
-    const handleAddRoute = () => {
-        dispatch(addTraceSection()); // Dispatch action from routeTraceSlice
+    // No need for handleAddRoute or dispatching add/remove actions anymore
+
+    // Ensure trace exists before rendering (should always exist based on slice initial state)
+    if (!trace) {
+        return <Typography>Loading trace state...</Typography>; // Or some loading indicator
     }
 
-  return (
-    <Box>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Trace Network Route (Combined) {/* Added (Combined) for clarity */}
-      </Typography>
+    return (
+        <Box>
+            <Typography variant="h4" component="h1" gutterBottom>
+                Trace Network Route (Combined)
+            </Typography>
 
-      {/* Pass the correct SectionComponent prop */}
-      <RouteComparisonContainer traces={traces} SectionComponent={RouteTraceSection} />
+            {/* Render the single trace section directly */}
+            {/* Use Paper for consistent look with other pages */}
+            <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+                <RouteInputForm trace={trace} />
+                <RouteVisualizer trace={trace} />
+            </Paper>
 
-       <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-            <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                onClick={handleAddRoute}
-                disabled={traces.length >= 5} // Optional limit
-            >
-                Add Route for Comparison
-            </Button>
-       </Box>
-    </Box>
-  );
+            {/* Remove the "Add Route for Comparison" button and surrounding Box */}
+
+        </Box>
+    );
 };
 
 export default RouteTracePage;
@@ -3676,44 +3999,61 @@ import { v4 as uuidv4 } from 'uuid';
 
 // Helper to create initial trace state
 const createInitialTraceState = () => ({
-  id: uuidv4(), // Unique ID for this trace section
+  id: uuidv4(), // Unique ID for this trace instance
   sourceIp: '',
   destinationIp: '',
   sourceDg: '',
   destinationDg: '',
   sourceDgStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed', 'manual'
-  destinationDgStatus: 'idle', // 'manual' means user edited it after fetch/fail
+  destinationDgStatus: 'idle',
   traceStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed', 'partial_success'
-  sourceMacTrace: null, // Expecting format like [{hop: 1, ip: 'mac/ip', name: 'dev', type: 'L2/L3'}, ...] or null
-  destinationMacTrace: null, // Expecting format like [{hop: 1, ip: 'mac/ip', name: 'dev', type: 'L2/L3'}, ...] or null
-  mainRouteTrace: null, // Expecting format like [{hop: 1, ip: 'x', name: 'y'}, ...]
+  sourceMacTrace: null, // Expecting format like List[DetailedHop] or null
+  destinationMacTrace: null, // Expecting format like List[DetailedHop] or null
+  mainRouteTrace: null, // Expecting format like List[DetailedHop] or null
   error: null, // Can store string or object for more details
 });
 
-// --- Async Thunks ---
+// --- Async Thunks (Modified to accept traceId in payload but operate on single state) ---
 
+// Fetch DG needs traceId in case multiple slices use it, but RouteTrace only has one trace
 export const fetchDefaultGateway = createAsyncThunk(
   'routeTrace/fetchDefaultGateway',
-  async ({ ip, type, traceId }, { rejectWithValue }) => {
+  async ({ ip, type, traceId }, { rejectWithValue, getState }) => {
+    // Ensure the traceId matches the ID in the current state
+    const currentTraceId = getState().routeTrace.trace.id;
+    if (traceId !== currentTraceId) {
+         console.warn(`fetchDefaultGateway: Mismatched traceId. State: ${currentTraceId}, Action: ${traceId}. Ignoring action.`);
+         // Don't reject, just ignore if ID doesn't match current state
+         return { ignored: true }; // Signal that the action was ignored
+    }
+
     if (!ip) return rejectWithValue({ message: "IP address is required.", type, traceId });
     try {
       const gateway = await routeService.getDefaultGateway(ip);
-      // Assuming gateway is returned directly as a string
       if (!gateway) throw new Error("No gateway found by backend.");
-      return { gateway, type, traceId };
+      return { gateway, type, traceId }; // Return traceId for consistency
     } catch (error) {
       return rejectWithValue({ message: error.message || 'Failed to fetch DG', type, traceId });
     }
   }
 );
 
+// Perform trace needs traceId to ensure action corresponds to current state
 export const performFullTrace = createAsyncThunk(
   'routeTrace/performFullTrace',
-  async ({ traceId, sourceIp, destinationIp, sourceDg, destinationDg }, { rejectWithValue }) => {
+  async ({ traceId, sourceIp, destinationIp, sourceDg, destinationDg }, { rejectWithValue, getState }) => {
+    const currentTraceId = getState().routeTrace.trace.id;
+    if (traceId !== currentTraceId) {
+        console.warn(`performFullTrace: Mismatched traceId. State: ${currentTraceId}, Action: ${traceId}. Ignoring action.`);
+        // Don't reject, just ignore
+        return { ignored: true };
+    }
+
     if (!sourceIp || !destinationIp || !sourceDg || !destinationDg) {
         return rejectWithValue({ message: "Source IP, Destination IP, Source DG, and Destination DG are required.", traceId });
     }
     try {
+      // Perform the API calls concurrently
       const results = await Promise.allSettled([
         routeService.getRouteTrace(sourceIp, destinationIp, sourceDg, destinationDg), // Main route first
         routeService.getMacTrace(sourceIp, sourceDg),
@@ -3722,92 +4062,90 @@ export const performFullTrace = createAsyncThunk(
 
       const [mainRouteResult, sourceMacResult, destMacResult] = results;
 
+      // Extract data or null from results
       const mainRouteTrace = mainRouteResult.status === 'fulfilled' ? mainRouteResult.value : null;
       const sourceMacTrace = sourceMacResult.status === 'fulfilled' ? sourceMacResult.value : null;
       const destinationMacTrace = destMacResult.status === 'fulfilled' ? destMacResult.value : null;
 
+      // Collect error messages
       const errors = results
         .filter(p => p.status === 'rejected')
-        .map(p => p.reason.message || 'Unknown error')
+        .map(p => p.reason?.message || 'Unknown trace component error') // Use optional chaining
         .join('; ');
 
-      // Determine overall status: Assume failed unless main trace succeeds
+      // Determine overall status
       let status = 'failed'; // Default to failed
       if (mainRouteResult.status === 'fulfilled') {
-          status = errors ? 'partial_success' : 'succeeded';
+          status = errors ? 'partial_success' : 'succeeded'; // Success/Partial if main trace worked
       }
 
-      if (status === 'failed') {
-          // Throw error to be caught by rejectWithValue if the main trace failed fundamentally
-          throw new Error(errors || 'Trace failed');
+      if (status === 'failed' && mainRouteResult.status === 'rejected') {
+          // If the main trace failed fundamentally, throw its error to be caught by rejectWithValue
+          throw new Error(errors || mainRouteResult.reason?.message || 'Main trace failed fundamentally');
       }
 
       return {
-        traceId,
+        traceId, // Include traceId in the fulfilled payload for matching
         mainRouteTrace,
-        sourceMacTrace, // Expected to be an array of hops or null
+        sourceMacTrace,
         destinationMacTrace,
-        status, // 'succeeded' or 'partial_success'
+        status, // 'succeeded' or 'partial_success' or 'failed' (if only mac traces failed)
         error: errors || null // Report partial errors if any
       };
 
     } catch (error) {
       // Catches error from the try block (fundamental failure) or rejections if not handled above
-      return rejectWithValue({ message: error.message || 'Full trace failed', traceId, errorObj: error }); // Pass original error too if needed
+      return rejectWithValue({ message: error.message || 'Full trace operation failed', traceId, errorObj: error });
     }
   }
 );
 
-// --- Slice Definition ---
+// --- Slice Definition (Simplified State) ---
 
 const initialState = {
-  traces: [createInitialTraceState()], // Start with one trace section
+  // Contains only *one* trace state object, not an array
+  trace: createInitialTraceState(),
 };
 
 const routeTraceSlice = createSlice({
   name: 'routeTrace',
   initialState,
   reducers: {
-    addTraceSection: (state) => {
-       if (state.traces.length < 5) { // Limit comparison sections if needed
-         state.traces.push(createInitialTraceState());
-       }
-    },
-    removeTraceSection: (state, action) => {
-        const traceIdToRemove = action.payload;
-        if (state.traces.length > 1) { // Prevent removing the last one
-            state.traces = state.traces.filter(trace => trace.id !== traceIdToRemove);
-        }
-    },
+    // REMOVED: addTraceSection, removeTraceSection
+
     updateTraceInput: (state, action) => {
       const { traceId, field, value } = action.payload;
-      const trace = state.traces.find(t => t.id === traceId);
-      if (trace) {
-        trace[field] = value;
-        // Reset status and results when inputs change
-        trace.traceStatus = 'idle';
-        trace.mainRouteTrace = null;
-        trace.sourceMacTrace = null;
-        trace.destinationMacTrace = null;
-        trace.error = null;
+      // Check if the action is for the *current* trace object in state
+      if (state.trace.id === traceId) {
+          const trace = state.trace; // Direct reference to the single trace object
+          trace[field] = value;
+          // Reset status and results when inputs change
+          trace.traceStatus = 'idle';
+          trace.mainRouteTrace = null;
+          trace.sourceMacTrace = null;
+          trace.destinationMacTrace = null;
+          trace.error = null;
 
-        // Mark DG as manually entered if user changes it after auto-fetch/fail
-        if (field === 'sourceDg' && trace.sourceDgStatus !== 'loading') trace.sourceDgStatus = 'manual';
-        if (field === 'destinationDg' && trace.destinationDgStatus !== 'loading') trace.destinationDgStatus = 'manual';
+          // Mark DG as manually entered if user changes it after auto-fetch/fail
+          if (field === 'sourceDg' && trace.sourceDgStatus !== 'loading') trace.sourceDgStatus = 'manual';
+          if (field === 'destinationDg' && trace.destinationDgStatus !== 'loading') trace.destinationDgStatus = 'manual';
 
-        // Reset DG status if IP changes
-        if (field === 'sourceIp') {
-            trace.sourceDg = ''; // Clear old DG if source IP changes
-            trace.sourceDgStatus = 'idle';
-        }
-        if (field === 'destinationIp') {
-            trace.destinationDg = ''; // Clear old DG if destination IP changes
-            trace.destinationDgStatus = 'idle';
-        }
+          // Reset DG status if IP changes
+          if (field === 'sourceIp') {
+              trace.sourceDg = ''; // Clear old DG if source IP changes
+              trace.sourceDgStatus = 'idle';
+          }
+          if (field === 'destinationIp') {
+              trace.destinationDg = ''; // Clear old DG if destination IP changes
+              trace.destinationDgStatus = 'idle';
+          }
+      } else {
+          console.warn(`updateTraceInput: Mismatched traceId. State: ${state.trace.id}, Action: ${traceId}. Ignoring update.`);
       }
     },
     resetTraceState: (state) => {
-        state.traces = [createInitialTraceState()];
+        // Replace the existing trace object with a new initial one
+        state.trace = createInitialTraceState();
     }
   },
   extraReducers: (builder) => {
@@ -3815,82 +4153,87 @@ const routeTraceSlice = createSlice({
       // Default Gateway Fetching
       .addCase(fetchDefaultGateway.pending, (state, action) => {
         const { type, traceId } = action.meta.arg;
-        const trace = state.traces.find(t => t.id === traceId);
-        if (trace) {
-          if (type === 'source') trace.sourceDgStatus = 'loading';
-          if (type === 'destination') trace.destinationDgStatus = 'loading';
-          trace.error = null;
+        // Only update state if the pending action matches the current trace ID
+        if (state.trace.id === traceId) {
+          if (type === 'source') state.trace.sourceDgStatus = 'loading';
+          if (type === 'destination') state.trace.destinationDgStatus = 'loading';
+          state.trace.error = null; // Clear previous DG errors
         }
       })
       .addCase(fetchDefaultGateway.fulfilled, (state, action) => {
+         if (action.payload.ignored) return; // Do nothing if action was ignored
         const { gateway, type, traceId } = action.payload;
-        const trace = state.traces.find(t => t.id === traceId);
-        if (trace) {
+        // Only update state if the fulfilled action matches the current trace ID
+        if (state.trace.id === traceId) {
           if (type === 'source') {
-            trace.sourceDg = gateway;
-            trace.sourceDgStatus = 'succeeded';
+            state.trace.sourceDg = gateway;
+            state.trace.sourceDgStatus = 'succeeded';
           }
           if (type === 'destination') {
-            trace.destinationDg = gateway;
-            trace.destinationDgStatus = 'succeeded';
+            state.trace.destinationDg = gateway;
+            state.trace.destinationDgStatus = 'succeeded';
           }
+           // Clear general error if DG fetch succeeds (might overwrite a previous trace error)
+           state.trace.error = null;
         }
       })
       .addCase(fetchDefaultGateway.rejected, (state, action) => {
+        if (action.payload.ignored) return; // Do nothing if action was ignored
         const { message, type, traceId } = action.payload;
-        const trace = state.traces.find(t => t.id === traceId);
-         if (trace) {
-          if (type === 'source') trace.sourceDgStatus = 'failed';
-          if (type === 'destination') trace.destinationDgStatus = 'failed';
-           trace.error = `DG Fetch Error (${type}): ${message}`;
+        // Only update state if the rejected action matches the current trace ID
+        if (state.trace.id === traceId) {
+          if (type === 'source') state.trace.sourceDgStatus = 'failed';
+          if (type === 'destination') state.trace.destinationDgStatus = 'failed';
+          // Set the error specifically for DG failure
+          state.trace.error = `DG Fetch Error (${type}): ${message}`;
+          // Reset trace status if a DG fetch fails while trace was in progress/success
+          state.trace.traceStatus = 'idle';
         }
       })
 
       // Full Trace Execution
       .addCase(performFullTrace.pending, (state, action) => {
         const { traceId } = action.meta.arg;
-
-
-        const trace = state.traces.find(t => t.id === traceId);
-        if (trace) {
-          trace.traceStatus = 'loading';
-          trace.error = null;
+        // Only update state if the pending action matches the current trace ID
+        if (state.trace.id === traceId) {
+          state.trace.traceStatus = 'loading';
+          state.trace.error = null;
           // Clear previous results while loading new ones
-          trace.mainRouteTrace = null;
-          trace.sourceMacTrace = null;
-          trace.destinationMacTrace = null;
+          state.trace.mainRouteTrace = null;
+          state.trace.sourceMacTrace = null;
+          state.trace.destinationMacTrace = null;
         }
       })
       .addCase(performFullTrace.fulfilled, (state, action) => {
+         if (action.payload.ignored) return; // Do nothing if action was ignored
         const { traceId, mainRouteTrace, sourceMacTrace, destinationMacTrace, status, error } = action.payload;
-
-        const trace = state.traces.find(t => t.id === traceId);
-        if (trace) {
-          trace.traceStatus = status; // 'succeeded' or 'partial_success'
-          trace.mainRouteTrace = mainRouteTrace;
-          trace.sourceMacTrace = sourceMacTrace;
-          trace.destinationMacTrace = destinationMacTrace;
-          trace.error = error; // Store any partial errors reported
+        // Only update state if the fulfilled action matches the current trace ID
+        if (state.trace.id === traceId) {
+          state.trace.traceStatus = status; // 'succeeded' or 'partial_success' or 'failed'
+          state.trace.mainRouteTrace = mainRouteTrace;
+          state.trace.sourceMacTrace = sourceMacTrace;
+          state.trace.destinationMacTrace = destinationMacTrace;
+          state.trace.error = error; // Store any partial errors reported
         }
       })
       .addCase(performFullTrace.rejected, (state, action) => {
+        if (action.payload.ignored) return; // Do nothing if action was ignored
         const { message, traceId } = action.payload;
-
-        const trace = state.traces.find(t => t.id === traceId);
-        if (trace) {
-          trace.traceStatus = 'failed';
-          trace.error = message; // Store the main error message
-           // Results are already cleared in pending or might be null from failed calls
+        // Only update state if the rejected action matches the current trace ID
+        if (state.trace.id === traceId) {
+          state.trace.traceStatus = 'failed';
+          state.trace.error = message; // Store the main error message
            // Ensure results are explicitly null on failure
-           trace.mainRouteTrace = null;
-           trace.sourceMacTrace = null;
-           trace.destinationMacTrace = null;
+           state.trace.mainRouteTrace = null;
+           state.trace.sourceMacTrace = null;
+           state.trace.destinationMacTrace = null;
         }
       });
   },
 });
 
-export const { addTraceSection, removeTraceSection, updateTraceInput, resetTraceState } = routeTraceSlice.actions;
+// Export only the relevant actions
+export const { updateTraceInput, resetTraceState } = routeTraceSlice.actions;
 export default routeTraceSlice.reducer;
 
 // ----- End File: src/store/slices/routeTraceSlice.js -----
