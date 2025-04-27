@@ -1,7 +1,6 @@
-// ----- File: src/components/Comparison/ComparisonSelector.jsx -----
-
+// ----- File: src\components\Comparison\ComparisonSelector.jsx -----
 import React from 'react';
-import { Autocomplete, TextField, Checkbox, Box, Typography, Chip } from '@mui/material';
+import { Autocomplete, TextField, Checkbox, Box, Typography, Chip, Stack, Paper } from '@mui/material';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import { formatTimestamp } from '../../utils/formatters';
@@ -11,28 +10,23 @@ const checkedIcon = <CheckBoxIcon fontSize="small" />;
 
 const ComparisonSelector = ({ availableRoutes, selectedIds, onChange }) => {
 
-    // Find the route objects corresponding to the selected IDs
+    // Find the full route objects corresponding to the selected IDs for the Autocomplete value prop
     const selectedRoutes = availableRoutes.filter(route => selectedIds.includes(route.id));
 
-    // --- FIX: Create a copy before sorting ---
-    // Use the spread syntax (...) to create a shallow copy of the array
+    // Sort available routes: Create a copy first! Sort newest first.
     const sortedOptions = [...availableRoutes].sort((a, b) => {
-        // Robust date comparison
         const dateA = a.timestamp ? new Date(a.timestamp) : 0;
         const dateB = b.timestamp ? new Date(b.timestamp) : 0;
-        // Ensure valid dates are compared; handle potential invalid dates gracefully
         if (isNaN(dateA) && isNaN(dateB)) return 0;
-        if (isNaN(dateA)) return 1; // Put invalid dates last
-        if (isNaN(dateB)) return -1; // Put invalid dates last
-        return dateB - dateA; // Sort newest first
+        if (isNaN(dateA)) return 1;
+        if (isNaN(dateB)) return -1;
+        return dateB - dateA; // Newest first
     });
-    // --- End FIX ---
 
     const getOptionLabel = (option) => {
-        // Generate a descriptive label for each route in the dropdown
-        const user = option.user ? `User: ${option.user.username}` : 'N/A';
-        const time = formatTimestamp(option.timestamp, 'MMM d, HH:mm');
-        return `${option.source || 'N/A'} → ${option.destination || 'N/A'} (${time}, ${user}, ID: ${option.id})`;
+        // Label primarily used for filtering/searching, keep it concise
+        const user = option.user ? `${option.user.username}` : 'N/A';
+        return `${option.source || 'N/A'} -> ${option.destination || 'N/A'} (${user}, ${option.id})`;
     };
 
     const handleChange = (event, newValue) => {
@@ -42,58 +36,66 @@ const ComparisonSelector = ({ availableRoutes, selectedIds, onChange }) => {
     };
 
     return (
-        <Box sx={{ mb: 2 }}>
-            <Typography variant="h6" gutterBottom>Select Routes to Compare</Typography>
+        <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                Select Historical Traces to Compare
+            </Typography>
             <Autocomplete
                 multiple
                 id="route-comparison-selector"
-                options={sortedOptions} // <-- Use the sorted COPY
-                disableCloseOnSelect
-                value={selectedRoutes} // Pass the selected route *objects* to Autocomplete
-                getOptionLabel={getOptionLabel} // Function to display each option
-                isOptionEqualToValue={(option, value) => option.id === value.id} // How to compare options
-                onChange={handleChange} // Handle changes
+                options={sortedOptions} // Use the sorted COPY
+                value={selectedRoutes} // Pass the selected route *objects*
+                getOptionLabel={getOptionLabel} // Function for text value and filtering
+                isOptionEqualToValue={(option, value) => option.id === value.id} // Crucial for matching objects
+                onChange={handleChange}
+                disableCloseOnSelect // Keep dropdown open when selecting multiple items
                 renderOption={(props, option, { selected }) => (
-                    // Ensure the key is unique and stable if possible, using option.id
-                    <li {...props} key={option.id} style={{ display: 'flex', alignItems: 'center' }}>
+                    // Use the li element provided by props for accessibility
+                    <li {...props} key={option.id} style={{ display: 'flex', alignItems: 'flex-start', padding: '8px 16px' }}>
                         <Checkbox
                             icon={icon}
                             checkedIcon={checkedIcon}
-                            style={{ marginRight: 8 }}
+                            style={{ marginRight: 8, marginTop: -6 }} // Align checkbox nicely
                             checked={selected}
-                            // Add aria-labelledby or similar for accessibility if needed
+                            size="small"
                         />
-                        <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-                             {/* Main route identifier */}
-                             <Typography variant="body2" sx={{ wordBreak: 'break-word', lineHeight: 1.3 }}>
-                                <Chip label="Src" size="small" color="primary" sx={{ mr: 0.5, height: '18px', verticalAlign: 'middle' }} />
-                                <Typography component="span" sx={{ fontWeight: 'medium', verticalAlign: 'middle' }}>{option.source || 'N/A'}</Typography>
-                                <Typography component="span" sx={{ mx: 1, verticalAlign: 'middle' }}>→</Typography>
-                                <Chip label="Dst" size="small" color="secondary" sx={{ mr: 0.5, height: '18px', verticalAlign: 'middle' }} />
-                                <Typography component="span" sx={{ fontWeight: 'medium', verticalAlign: 'middle' }}>{option.destination || 'N/A'}</Typography>
+                        {/* Use Stack for better layout of option details */}
+                        <Stack spacing={0.5} sx={{ flexGrow: 1 }}>
+                             {/* Main route identifier with Chips */}
+                             <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                                <Chip label="Src" size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                                <Typography component="span" sx={{ fontWeight: 500, wordBreak: 'break-all' }}>{option.source || '?'}</Typography>
+                                <Typography component="span" sx={{ mx: 0.5 }}>→</Typography>
+                                <Chip label="Dst" size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                                <Typography component="span" sx={{ fontWeight: 500, wordBreak: 'break-all' }}>{option.destination || '?'}</Typography>
                              </Typography>
                              {/* Secondary details: Timestamp, User, ID */}
                              <Typography variant="caption" color="text.secondary">
-                                {formatTimestamp(option.timestamp)} {option.user ? `(${option.user.username})` : ''} (ID: {option.id})
+                                {formatTimestamp(option.timestamp, 'PPp')} {/* More readable format */}
+                                {option.user ? ` • ${option.user.username}` : ''}
+                                <span style={{ marginLeft: '8px', opacity: 0.7 }}>(ID: {option.id})</span>
                              </Typography>
-                        </Box>
+                        </Stack>
                     </li>
                 )}
                 renderInput={(params) => (
                     <TextField
                         {...params}
                         variant="outlined"
-                        label="Search and Select Historical Traces"
-                        placeholder="Select Routes..."
-                        // InputLabelProps={{ shrink: true }} // Optional: always show label shrunk
+                        label="Search or Select Traces"
+                        placeholder={selectedRoutes.length > 0 ? `${selectedRoutes.length} selected` : "Select from history..."}
+                        InputLabelProps={{ shrink: true }} // Keep label shrunk
                     />
                 )}
-                sx={{ width: '100%' }} // Make it full width
+                sx={{ width: '100%' }} // Make Autocomplete full width
             />
-        </Box>
+            {selectedRoutes.length > 0 && (
+                <Typography variant="caption" display="block" sx={{ mt: 1, color: 'text.secondary' }}>
+                    Currently comparing {selectedRoutes.length} trace{selectedRoutes.length > 1 ? 's' : ''}.
+                </Typography>
+            )}
+        </Paper>
     );
 };
 
 export default ComparisonSelector;
-
-// ----- End File: src/components/Comparison/ComparisonSelector.jsx -----
