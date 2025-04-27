@@ -1,4 +1,5 @@
 // ----- File: src\components\RouteTrace\DirectRouteVisualizer.jsx -----
+// ----- File: src\components\RouteTrace\DirectRouteVisualizer.jsx -----
 import React from 'react';
 import { Box, Typography, Stack, Paper, Chip, Divider } from '@mui/material';
 import LoadingSpinner from '../Common/LoadingSpinner';
@@ -7,18 +8,19 @@ import HopDisplay from './HopDisplay';
 
 const DirectRouteVisualizer = ({ trace }) => {
   const {
-    sourceIp, destinationIp, sourceDg, destinationDg, vrf,
-    traceResult,
+    // sourceIp, destinationIp removed
+    sourceDg, destinationDg, vrf, // Using Gateway IPs now
+    traceResult, // This should hold the List[DetailedHop] from the backend
     traceStatus,
     error
   } = trace;
 
   const isLoading = traceStatus === 'loading';
-  // Separate DG fetch errors from trace errors for display
-  const isDgError = error && (trace.sourceDgStatus === 'failed' || trace.destinationDgStatus === 'failed');
-  const isTraceError = error && traceStatus === 'failed' && !isDgError;
+  // Dg fetch errors are removed
+  const isTraceError = error && traceStatus === 'failed';
   const displayError = isTraceError; // Only display trace error here
 
+  // Use traceResult which holds the array of hops
   const hasResults = traceResult && traceResult.length > 0;
 
   // Don't render anything in idle state unless there's an error already
@@ -50,7 +52,7 @@ const DirectRouteVisualizer = ({ trace }) => {
       {/* Display results container only if not loading and no specific trace error */}
       {!isLoading && !displayError && (
         <Paper elevation={0} variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
-          {/* Header: Source Info -> Destination Info */}
+          {/* Header: Source Gateway -> Destination Gateway */}
           <Stack
              direction={{ xs: 'column', sm: 'row' }}
              justifyContent="space-around"
@@ -58,22 +60,24 @@ const DirectRouteVisualizer = ({ trace }) => {
              spacing={2}
              sx={{ mb: 2, textAlign: 'center' }}
           >
-              {/* Source Box */}
+              {/* Source Gateway Box */}
               <Paper elevation={0} sx={{ p: 1.5, flexGrow: 1, border: 1, borderColor: 'primary.light', borderRadius: 1 }}>
-                  <Typography variant="overline" display="block" sx={{ lineHeight: 1.2, color: 'primary.main' }}>Source</Typography>
-                  <Typography variant="body2" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{sourceIp || 'N/A'}</Typography>
-                  <Typography variant="caption" display="block" sx={{ wordBreak: 'break-all', color: 'text.secondary' }}>DG: {sourceDg || 'N/A'}</Typography>
+                  <Typography variant="overline" display="block" sx={{ lineHeight: 1.2, color: 'primary.main' }}>Source Gateway</Typography>
+                  {/* Display Source Gateway IP */}
+                  <Typography variant="body2" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{sourceDg || 'N/A'}</Typography>
+                   {/* Removed original source IP display */}
               </Paper>
 
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                  <Typography variant="h5" sx={{ color: 'text.secondary', transform: { xs: 'rotate(90deg)', sm: 'none'} }}>→</Typography>
               </Box>
 
-              {/* Destination Box */}
+              {/* Destination Gateway Box */}
               <Paper elevation={0} sx={{ p: 1.5, flexGrow: 1, border: 1, borderColor: 'secondary.light', borderRadius: 1 }}>
-                  <Typography variant="overline" display="block" sx={{ lineHeight: 1.2, color: 'secondary.main' }}>Destination</Typography>
-                  <Typography variant="body2" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{destinationIp || 'N/A'}</Typography>
-                  <Typography variant="caption" display="block" sx={{ wordBreak: 'break-all', color: 'text.secondary' }}>DG: {destinationDg || 'N/A'}</Typography>
+                  <Typography variant="overline" display="block" sx={{ lineHeight: 1.2, color: 'secondary.main' }}>Destination Gateway</Typography>
+                  {/* Display Destination Gateway IP */}
+                  <Typography variant="body2" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{destinationDg || 'N/A'}</Typography>
+                   {/* Removed original destination IP display */}
               </Paper>
           </Stack>
 
@@ -107,7 +111,7 @@ const DirectRouteVisualizer = ({ trace }) => {
              // Show message only if trace succeeded but returned no hops
              traceStatus === 'succeeded' && (
                 <Typography align="center" color="text.secondary" sx={{ my: 3, fontStyle: 'italic' }}>
-                    No route trace hops were returned between the specified points.
+                    No route trace hops were returned between the specified gateways in VRF '{vrf}'.
                 </Typography>
              )
           )}
@@ -118,3 +122,5 @@ const DirectRouteVisualizer = ({ trace }) => {
 };
 
 export default DirectRouteVisualizer;
+
+// ----- End File: src\components\RouteTrace\DirectRouteVisualizer.jsx -----

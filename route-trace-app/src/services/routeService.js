@@ -1,3 +1,4 @@
+// ----- File: src\services\routeService.js -----
 import apiClient from './api';
 
 // Corresponds to get_default_gateway(ip: str)
@@ -31,21 +32,21 @@ const getMacTrace = async (ip, dg) => {
 
 // Corresponds to get_route_trace (or potentially get_tufin_route - clarify which one to use)
 // Using get_route_trace based on code snippets provided
-const getRouteTrace = async (source_ip, destination_ip, source_dg = null, destination_dg = null, source_dg_name = null, destination_dg_name = null, vrf = null, destination_vrf = null) => {
+// This function now handles both the combined trace (DGs provided for MAC tracing)
+// and the direct trace (DGs provided as start/end points, VRF optional)
+const getRouteTrace = async (source_ip, destination_ip, source_dg = null, destination_dg = null, vrf = null) => {
     try {
         const params = {
             source_ip,
             destination_ip,
-            // Add other params only if they have values
+            // Add other params only if they have values (not null/undefined)
             ...(source_dg && { source_dg }),
             ...(destination_dg && { destination_dg }),
-            ...(source_dg_name && { source_dg_name }),
-            ...(destination_dg_name && { destination_dg_name }),
             ...(vrf && { vrf }),
-            ...(destination_vrf && { destination_vrf }),
         };
+        // Endpoint should match the modified dummy backend or real backend
         const response = await apiClient.get('/get-route-trace', { params });
-         // Backend saves automatically, frontend just gets the result.
+         // Backend saves automatically (in dummy/real logic), frontend just gets the result.
          // Assuming backend returns the full route trace data (e.g., list of hops)
         return response.data; // Modify based on actual backend response structure
     } catch (error) {
@@ -92,3 +93,5 @@ const routeService = {
 };
 
 export default routeService;
+
+// ----- End File: src\services\routeService.js -----

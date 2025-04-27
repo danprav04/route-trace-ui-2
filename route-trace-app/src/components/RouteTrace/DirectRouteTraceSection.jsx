@@ -1,4 +1,5 @@
 // ----- File: src\components\RouteTrace\DirectRouteTraceSection.jsx -----
+// ----- File: src\components\RouteTrace\DirectRouteTraceSection.jsx -----
 import React from 'react';
 import { Paper, Box, IconButton, Tooltip, Divider } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -62,3 +63,5 @@ const DirectRouteTraceSection = ({ trace, canRemove }) => {
 };
 
 export default DirectRouteTraceSection;
+
+// ----- End File: src\components\RouteTrace\DirectRouteTraceSection.jsx -----

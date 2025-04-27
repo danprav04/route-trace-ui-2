@@ -1,3 +1,4 @@
+// ----- File: src\store\store.js -----
 // ----- File: src/store/store.js -----
 
 import { configureStore } from '@reduxjs/toolkit';
@@ -21,3 +22,4 @@ const store = configureStore({
 export default store;
 
 // ----- End File: src/store/store.js -----
+// ----- End File: src\store\store.js -----

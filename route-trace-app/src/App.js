@@ -1,4 +1,5 @@
 // ----- File: src\App.js -----
+// ----- File: src\App.js -----
 import React, { useState, useMemo } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import {
@@ -161,3 +162,5 @@ function App() {
 }
 
 export default App;
+
+// ----- End File: src\App.js -----
