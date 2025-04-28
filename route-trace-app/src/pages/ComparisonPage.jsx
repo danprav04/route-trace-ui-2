@@ -21,6 +21,8 @@ const ComparisonPage = () => {
     const [selectedRouteIds, setSelectedRouteIds] = useState([]);
     // State to control the minimalist view toggle
     const [isMinimalView, setIsMinimalView] = useState(false); // Default to detailed view
+    // State to track the reversed display status for each selected trace
+    const [reversedStates, setReversedStates] = useState({}); // { [traceId]: boolean }
 
     // Fetch all history if it hasn't been fetched yet
     useEffect(() => {
@@ -34,12 +36,24 @@ const ComparisonPage = () => {
     // Handler for when the selection in ComparisonSelector changes
     const handleSelectionChange = (selectedIds) => {
         setSelectedRouteIds(selectedIds);
+        // Optional: Reset reversed states when selection changes, or keep them?
+        // Keeping them might be useful if re-selecting the same trace.
+        // setReversedStates({}); // Uncomment to reset reverse state on selection change
     };
 
     // Handler for toggling the minimal view
     const handleViewToggle = () => {
         setIsMinimalView(!isMinimalView);
     };
+
+    // Handler for toggling the reverse display of a specific trace item
+    const handleToggleReverse = (traceId) => {
+        setReversedStates(prev => ({
+            ...prev,
+            [traceId]: !prev[traceId] // Toggle the boolean value for the specific id
+        }));
+    };
+
 
     // Filter the full history data based on the selected IDs
     // This derived state will be passed to the comparison container
@@ -56,19 +70,25 @@ const ComparisonPage = () => {
                  <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 0 }}>
                     Compare Historical Traces
                  </Typography>
-                 {/* Toggle Button for Minimal View - Only show if routes are loaded */}
+                 {/* View Toggle Buttons */}
                  {allHistoryStatus === 'succeeded' && (
-                    <Tooltip title={isMinimalView ? "Show Full Details" : "Show Minimal View (Hops Only)"}>
-                        <ToggleButton
-                            value="check"
-                            selected={isMinimalView}
-                            onChange={handleViewToggle}
-                            size="small"
-                            aria-label="Toggle minimal view"
-                        >
-                            {isMinimalView ? <ViewHeadlineIcon /> : <ViewCompactIcon />}
-                        </ToggleButton>
-                    </Tooltip>
+                    <Stack direction="row" spacing={1}>
+                        <Tooltip title={isMinimalView ? "Show Full Details" : "Show Minimal View (Hops Only)"}>
+                            <ToggleButton
+                                value="minimal"
+                                selected={isMinimalView}
+                                onChange={handleViewToggle}
+                                size="small"
+                                aria-label="Toggle minimal view"
+                            >
+                                {isMinimalView ? <ViewHeadlineIcon /> : <ViewCompactIcon />}
+                            </ToggleButton>
+                        </Tooltip>
+                        {/* Optional: Add a button to reset all reversals if needed */}
+                        {/* <Tooltip title="Reset All Reversed Views"> */}
+                        {/*     <Button size="small" onClick={() => setReversedStates({})}>Reset View</Button> */}
+                        {/* </Tooltip> */}
+                    </Stack>
                  )}
              </Stack>
 
@@ -92,10 +112,13 @@ const ComparisonPage = () => {
                     {selectedRoutesData.length > 0 ? (
                          <Box sx={{ mt: 3 }}>
                              {/* Container responsible for laying out the comparison items */}
+                             {/* Pass isMinimalView and reversedStates + handler down */}
                              <RouteComparisonContainer
                                 traces={selectedRoutesData} // Pass the filtered historical data
                                 SectionComponent={ComparisonItem} // ComparisonItem renders HistoryTraceVisualizer internally
                                 isMinimalView={isMinimalView} // Pass the view mode state
+                                reversedStates={reversedStates} // Pass the reverse states object
+                                onToggleReverse={handleToggleReverse} // Pass the handler
                              />
                          </Box>
                     ) : (
@@ -106,7 +129,7 @@ const ComparisonPage = () => {
                             variant="outlined" // Use outlined for less emphasis
                             sx={{ mt: 3 }}
                          >
-                            Select two or more routes (Combined, Direct, or MAC) from the list above to compare them side-by-side. Use the <ViewCompactIcon fontSize='small' sx={{verticalAlign: 'bottom', mx: 0.5}}/> button to toggle a minimal view.
+                            Select two or more routes (Combined, Direct, or MAC) from the list above to compare them side-by-side. Use the <ViewCompactIcon fontSize='small' sx={{verticalAlign: 'bottom', mx: 0.5}}/> button to toggle a minimal view. Individual traces can be visually reversed using the swap icon in their header.
                          </Alert>
                     )}
                 </>

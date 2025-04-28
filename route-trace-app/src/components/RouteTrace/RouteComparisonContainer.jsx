@@ -6,8 +6,14 @@ import { Box, Grid, Alert } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 // Generic container for side-by-side comparison of trace sections
-// Now accepts and forwards isMinimalView prop
-const RouteComparisonContainer = ({ traces = [], SectionComponent, isMinimalView = false }) => {
+// Now accepts and forwards isMinimalView, reversedStates, and onToggleReverse props
+const RouteComparisonContainer = ({
+    traces = [],
+    SectionComponent,
+    isMinimalView = false,
+    reversedStates = {}, // Default to empty object
+    onToggleReverse // Handler function
+}) => {
   // Check if a valid SectionComponent was provided
   if (!SectionComponent) {
     console.error("RouteComparisonContainer requires a valid SectionComponent prop.");
@@ -44,12 +50,16 @@ const RouteComparisonContainer = ({ traces = [], SectionComponent, isMinimalView
           // Child Grid components now use breakpoint props directly
           // Removed the 'item' prop
           <Grid {...columnProps} key={trace.id}>
-             {/* Render the provided SectionComponent, passing the trace data, canRemove flag, AND isMinimalView */}
-             {/* Ensure SectionComponent handles height/layout internally (e.g., height: '100%') */}
+             {/* Render the provided SectionComponent */}
+             {/* Pass down all relevant props: trace data, view modes, handlers */}
              <SectionComponent
                 trace={trace}
                 canRemove={canRemove} // Note: Removal logic depends on the specific slice implementation
                 isMinimalView={isMinimalView} // Pass down the view mode
+                // Pass the specific reversed state for this trace
+                isReversed={reversedStates[trace.id] || false}
+                // Pass the handler function
+                onToggleReverse={onToggleReverse}
               />
           </Grid>
         ))}

@@ -1,7 +1,7 @@
 // ----- File: src\components\Comparison\HistoryTraceVisualizer.jsx -----
 
 import React from 'react';
-import { Box, Typography, Stack, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Divider } from '@mui/material';
+import { Box, Typography, Stack, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Divider, Tooltip } from '@mui/material'; // Removed IconButton
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoIcon from '@mui/icons-material/Info';
 import CodeIcon from '@mui/icons-material/Code'; // For input details
@@ -9,13 +9,19 @@ import AccountTreeIcon from '@mui/icons-material/AccountTree'; // Main Route
 import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // MAC Route
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows'; // For MAC trace display
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz'; // Keep for chip icon
 import HopDisplay from '../RouteTrace/HopDisplay'; // Reuse the hop display component
 import { formatTimestamp } from '../../utils/formatters';
 
 // Helper to render a hop section (reusable for main, source mac, dest mac)
-// NOW includes horizontal scrolling wrapper - Adjusted Structure
-const renderHopSection = (hops, title, icon, defaultExpanded = false) => {
+// NOW accepts isReversed prop to reverse the hop order visually
+const renderHopSection = (hops, title, icon, defaultExpanded = false, isReversed = false) => { // Added isReversed parameter
     // Assumes hops is a non-empty array
+    if (!hops || hops.length === 0) return null; // Return null if no hops
+
+    // Create a potentially reversed copy for mapping
+    // DO NOT MUTATE the original hops array from the state/props
+    const hopsToRender = isReversed ? [...hops].reverse() : hops;
 
     return (
         <Accordion
@@ -32,6 +38,12 @@ const renderHopSection = (hops, title, icon, defaultExpanded = false) => {
              >
                  {icon && React.cloneElement(icon, { sx: { mr: 1, color: 'action.active', fontSize: '1.2rem' } })}
                  <Typography variant="caption" fontWeight="medium">{title} ({hops.length} hops)</Typography>
+                 {/* Add indicator if hops are visually reversed */}
+                 {isReversed && (
+                    <Tooltip title="Hop order visually reversed">
+                        <SwapHorizIcon fontSize="inherit" sx={{ ml: 0.5, color: 'warning.main', verticalAlign: 'middle' }} />
+                    </Tooltip>
+                 )}
              </AccordionSummary>
              {/* AccordionDetails now acts as the scrolling container */}
              <AccordionDetails sx={{
@@ -60,12 +72,16 @@ const renderHopSection = (hops, title, icon, defaultExpanded = false) => {
                          // Removed py here, handled by AccordionDetails padding
                      }}
                  >
-                     {hops.map((hop, index) => (
+                     {/* Map over the potentially reversed hops array */}
+                     {hopsToRender.map((hop, index) => (
                          <HopDisplay
-                             key={`${hop.device_id || hop.ip || hop.mac || `hop-${hop.hop}`}-${index}`} // More robust key
+                             key={`${hop.device_id || hop.ip || hop.mac || `hop-${hop.hop}`}-${index}-${isReversed}`} // Add isReversed to key for safety
                              hopData={hop}
+                             // isFirst/isLast depend on the *visual* index after potential reversal
                              isFirst={index === 0}
-                             isLast={index === hops.length - 1}
+                             isLast={index === hopsToRender.length - 1}
+                             // Pass isReversed down to HopDisplay so it can adjust arrow rendering
+                             isReversed={isReversed}
                          />
                      ))}
                  </Stack>
@@ -75,7 +91,12 @@ const renderHopSection = (hops, title, icon, defaultExpanded = false) => {
 };
 
 
-const HistoryTraceVisualizer = ({ route, isMinimalView = false }) => { // Accept isMinimalView prop
+const HistoryTraceVisualizer = ({
+    route,
+    isMinimalView = false,
+    isReversed = false, // Accept isReversed prop
+    // onToggleReverse is no longer needed here
+}) => {
     if (!route) return <Typography color="error">Invalid route data provided.</Typography>;
 
     const {
@@ -84,10 +105,19 @@ const HistoryTraceVisualizer = ({ route, isMinimalView = false }) => { // Accept
     } = route;
 
     // Determine primary identifiers based on trace type for header display
-    const primarySourceLabel = trace_type === 'direct' ? "Src GW" : (trace_type === 'mac' ? "Endpoint" : "Src IP");
-    const primaryDestLabel = trace_type === 'direct' ? "Dst GW" : (trace_type === 'mac' ? "Gateway" : "Dst IP");
-    const separator = trace_type === 'mac' ? '↔' : '→';
+    let primarySourceLabel = trace_type === 'direct' ? "Src GW" : (trace_type === 'mac' ? "Endpoint" : "Src IP");
+    let primaryDestLabel = trace_type === 'direct' ? "Dst GW" : (trace_type === 'mac' ? "Gateway" : "Dst IP");
+    const separator = trace_type === 'mac' ? '↔' : '→'; // Separator reflects actual trace type
 
+    // Values to display in the header
+    let displaySource = source;
+    let displayDest = destination;
+
+    // If reversed, swap the displayed values and labels for the header
+    if (isReversed) {
+        [displaySource, displayDest] = [destination, source];
+        [primarySourceLabel, primaryDestLabel] = [primaryDestLabel, primarySourceLabel];
+    }
 
     // Check if data exists for different sections
     const hasMainRoute = mainRouteTrace && mainRouteTrace.length > 0;
@@ -96,18 +126,22 @@ const HistoryTraceVisualizer = ({ route, isMinimalView = false }) => { // Accept
     const hasInputs = inputDetails && typeof inputDetails === 'object' && Object.keys(inputDetails).length > 0;
     const vrf = inputDetails?.vrf; // Extract VRF if present in inputs
 
+    // Determine default expansion for main route based on view modes
+    const defaultExpandMain = !isMinimalView && !isReversed; // Expand main route by default unless minimal or reversed
+
     return (
         // Conditionally adjust padding/margins based on minimal view
         <Box sx={{
             flexGrow: 1,
             display: 'flex',
             flexDirection: 'column',
-            // Remove vertical padding in minimal view if ComparisonItem provides it
-            // py: isMinimalView ? 0 : 1,
+            // Add paddingTop if reverse button is outside and potentially overlaps
+             pt: isMinimalView ? 3 : 0, // Add padding top in minimal view to make space for button
         }}>
             {/* Header Info - Conditionally Rendered */}
             { !isMinimalView && (
-                 <Paper elevation={0} variant="outlined" sx={{ p: 1.5, mb: 2 }}>
+                 <Paper elevation={0} variant="outlined" sx={{ p: 1.5, mb: 2, position: 'relative' }}>
+                     {/* Button Removed From Here */}
                      <Stack
                         direction={{ xs: 'column', sm: 'row' }}
                         justifyContent="space-between"
@@ -115,19 +149,22 @@ const HistoryTraceVisualizer = ({ route, isMinimalView = false }) => { // Accept
                         spacing={{ xs: 1, sm: 2 }}
                         flexWrap="wrap"
                      >
-                        {/* Source/Destination */}
+                        {/* Source/Destination (Uses displaySource/displayDest based on isReversed) */}
                         <Box sx={{ minWidth: 0 }}>
                             <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
                                  <Chip label={primarySourceLabel} size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
-                                 <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{source || 'N/A'}</Typography>
-                                 <Typography component="span" sx={{ mx: 1 }}>{separator}</Typography>
+                                 <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{displaySource || 'N/A'}</Typography>
+                                 <Typography component="span" sx={{ mx: 1 }}>{separator}</Typography> {/* Separator reflects actual trace */}
                                  <Chip label={primaryDestLabel} size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
-                                 <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{destination || 'N/A'}</Typography>
+                                 <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{displayDest || 'N/A'}</Typography>
                             </Typography>
                             {/* Display Trace Type and VRF if applicable */}
                             <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
                                 <Chip label={trace_type?.toUpperCase()} size="small" variant='filled' color="default" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 'medium' }} />
                                 {vrf && <Chip label={`VRF: ${vrf}`} size="small" variant='outlined' color="info" sx={{ height: 20, fontSize: '0.7rem' }} />}
+                                {isReversed && (
+                                    <Chip label="Reversed Display" size="small" variant='outlined' color="warning" sx={{ height: 20, fontSize: '0.65rem', fontStyle:'italic' }} icon={<SwapHorizIcon fontSize='inherit' />} />
+                                )}
                             </Stack>
                         </Box>
                          {/* Timestamp/User/ID */}
@@ -176,26 +213,50 @@ const HistoryTraceVisualizer = ({ route, isMinimalView = false }) => { // Accept
                  </Accordion>
             )}
 
-            {/* --- Trace Specific Visualizations (Always Rendered) --- */}
+            {/* --- Trace Specific Visualizations (Always Rendered, Order respects actual trace) --- */}
+            {/* Pass isReversed down to renderHopSection */}
 
             {/* Combined Trace */}
             {trace_type === 'combined' && (
                 <>
-                    {/* Source L2 Path - Render only if data exists */}
-                    {hasSourceMac && renderHopSection(sourceMacTrace, "Source MAC Path", <SettingsEthernetIcon />)}
-                    {/* Divider/Indicator - Render only if both sections exist AND not minimal view */}
+                    {/* Source MAC Trace - Render based on isReversed */}
+                    {renderHopSection(
+                        sourceMacTrace,
+                        isReversed ? "Visually Reversed Source MAC Path" : "Source MAC Path",
+                        <SettingsEthernetIcon />,
+                        false, // Default expansion (usually false for this)
+                        isReversed // Pass reverse state
+                    )}
+
+                    {/* Divider */}
                     {hasSourceMac && hasMainRoute && !isMinimalView && (
                         <Box textAlign="center" sx={{ my: -0.5 }}><ArrowDownwardIcon fontSize="small" color="action" sx={{ opacity: 0.5 }} /></Box>
                     )}
-                    {/* Main IP Path - Render only if data exists */}
-                    {hasMainRoute && renderHopSection(mainRouteTrace, "Main Route Path (IP Hops)", <AccountTreeIcon />, !isMinimalView)} {/* Expand by default only if not minimal */}
-                     {/* Divider/Indicator - Render only if both sections exist AND not minimal view */}
+
+                    {/* Main Route Trace - Render based on isReversed */}
+                    {renderHopSection(
+                        mainRouteTrace,
+                        isReversed ? "Visually Reversed Main Route Path" : "Main Route Path (IP Hops)",
+                        <AccountTreeIcon />,
+                        defaultExpandMain, // Default expansion
+                        isReversed // Pass reverse state
+                    )}
+
+                     {/* Divider */}
                     {hasMainRoute && hasDestMac && !isMinimalView && (
                         <Box textAlign="center" sx={{ my: -0.5 }}><ArrowDownwardIcon fontSize="small" color="action" sx={{ opacity: 0.5 }} /></Box>
                     )}
-                    {/* Destination L2 Path - Render only if data exists */}
-                    {hasDestMac && renderHopSection(destinationMacTrace, "Destination MAC Path", <SettingsEthernetIcon />)}
-                    {/* Show message if no parts have data */}
+
+                    {/* Destination MAC Trace - Render based on isReversed */}
+                    {renderHopSection(
+                        destinationMacTrace,
+                         isReversed ? "Visually Reversed Destination MAC Path" : "Destination MAC Path",
+                         <SettingsEthernetIcon />,
+                         false, // Default expansion
+                         isReversed // Pass reverse state
+                    )}
+
+                    {/* No data message */}
                     {!hasSourceMac && !hasMainRoute && !hasDestMac && (
                          <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
                             No detailed hop data available for this combined trace entry.
@@ -207,10 +268,14 @@ const HistoryTraceVisualizer = ({ route, isMinimalView = false }) => { // Accept
             {/* Direct Trace */}
             {trace_type === 'direct' && (
                  <>
-                    {/* Only show Main Route Path - Render only if data exists */}
-                    {hasMainRoute ? (
-                        renderHopSection(mainRouteTrace, "Direct Route Path", <AccountTreeIcon />, !isMinimalView) // Expand by default only if not minimal
-                    ) : (
+                    {renderHopSection(
+                        mainRouteTrace,
+                        isReversed ? "Visually Reversed Direct Route Path" : "Direct Route Path",
+                        <AccountTreeIcon />,
+                        defaultExpandMain,
+                        isReversed
+                    )}
+                    {!hasMainRoute && (
                          <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
                              No detailed hop data available for this direct trace entry.
                          </Typography>
@@ -221,10 +286,14 @@ const HistoryTraceVisualizer = ({ route, isMinimalView = false }) => { // Accept
             {/* MAC Trace */}
             {trace_type === 'mac' && (
                 <>
-                    {/* Only show Source MAC Path (renamed for clarity) - Render only if data exists */}
-                    {hasSourceMac ? (
-                        renderHopSection(sourceMacTrace, "MAC Trace Path", <SettingsEthernetIcon />, !isMinimalView) // Expand by default only if not minimal
-                    ) : (
+                    {renderHopSection(
+                        sourceMacTrace, // Note: MAC traces usually only have one 'segment'
+                        isReversed ? "Visually Reversed MAC Trace Path" : "MAC Trace Path",
+                        <SettingsEthernetIcon />,
+                        defaultExpandMain,
+                        isReversed
+                    )}
+                    {!hasSourceMac && (
                          <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
                              No detailed hop data available for this MAC trace entry.
                          </Typography>
