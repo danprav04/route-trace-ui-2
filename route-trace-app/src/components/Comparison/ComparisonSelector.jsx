@@ -1,12 +1,23 @@
-// ----- File: src\components\Comparison\ComparisonSelector.jsx -----
 import React from 'react';
-import { Autocomplete, TextField, Checkbox, Box, Typography, Chip, Stack, Paper } from '@mui/material';
+import { Autocomplete, TextField, Checkbox, Box, Typography, Chip, Stack, Paper, Tooltip } from '@mui/material';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
+import RouteIcon from '@mui/icons-material/Route'; // Combined Trace
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // MAC Trace
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck'; // Direct Route Trace
 import { formatTimestamp } from '../../utils/formatters';
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
+
+const getTraceTypeIcon = (type) => {
+    switch (type) {
+        case 'combined': return <Tooltip title="Combined Trace"><RouteIcon fontSize="inherit" color="primary" /></Tooltip>;
+        case 'direct': return <Tooltip title="Direct Trace"><NetworkCheckIcon fontSize="inherit" color="secondary" /></Tooltip>;
+        case 'mac': return <Tooltip title="MAC Trace"><SettingsEthernetIcon fontSize="inherit" color="success" /></Tooltip>;
+        default: return null;
+    }
+};
 
 const ComparisonSelector = ({ availableRoutes, selectedIds, onChange }) => {
 
@@ -24,9 +35,9 @@ const ComparisonSelector = ({ availableRoutes, selectedIds, onChange }) => {
     });
 
     const getOptionLabel = (option) => {
-        // Label primarily used for filtering/searching, keep it concise
+        // Label primarily used for filtering/searching, keep it concise and include type
         const user = option.user ? `${option.user.username}` : 'N/A';
-        return `${option.source || 'N/A'} -> ${option.destination || 'N/A'} (${user}, ${option.id})`;
+        return `[${option.trace_type?.toUpperCase()}] ${option.source || '?'} -> ${option.destination || '?'} (${user}, ID: ${option.id})`;
     };
 
     const handleChange = (event, newValue) => {
@@ -62,11 +73,16 @@ const ComparisonSelector = ({ availableRoutes, selectedIds, onChange }) => {
                         {/* Use Stack for better layout of option details */}
                         <Stack spacing={0.5} sx={{ flexGrow: 1 }}>
                              {/* Main route identifier with Chips */}
-                             <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-                                <Chip label="Src" size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                             <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.8, flexWrap: 'wrap' }}>
+                                {/* Indicate Trace Type */}
+                                {getTraceTypeIcon(option.trace_type)}
+                                {/* Source */}
+                                <Chip label={option.trace_type === 'direct' ? "Src GW" : (option.trace_type === 'mac' ? "Endpoint" : "Src IP")} size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
                                 <Typography component="span" sx={{ fontWeight: 500, wordBreak: 'break-all' }}>{option.source || '?'}</Typography>
-                                <Typography component="span" sx={{ mx: 0.5 }}>→</Typography>
-                                <Chip label="Dst" size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                                {/* Arrow / Separator */}
+                                <Typography component="span" sx={{ mx: 0.5 }}>{option.trace_type === 'mac' ? '↔' : '→'}</Typography>
+                                 {/* Destination */}
+                                <Chip label={option.trace_type === 'direct' ? "Dst GW" : (option.trace_type === 'mac' ? "Gateway" : "Dst IP")} size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
                                 <Typography component="span" sx={{ fontWeight: 500, wordBreak: 'break-all' }}>{option.destination || '?'}</Typography>
                              </Typography>
                              {/* Secondary details: Timestamp, User, ID */}
@@ -82,7 +98,7 @@ const ComparisonSelector = ({ availableRoutes, selectedIds, onChange }) => {
                     <TextField
                         {...params}
                         variant="outlined"
-                        label="Search or Select Traces"
+                        label="Search or Select Traces (Combined, Direct, MAC)"
                         placeholder={selectedRoutes.length > 0 ? `${selectedRoutes.length} selected` : "Select from history..."}
                         InputLabelProps={{ shrink: true }} // Keep label shrunk
                     />

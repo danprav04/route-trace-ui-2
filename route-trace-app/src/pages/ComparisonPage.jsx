@@ -1,17 +1,17 @@
-// ----- File: src\pages\ComparisonPage.jsx -----
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Box, Typography, Alert, Paper } from '@mui/material';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import ComparisonSelector from '../components/Comparison/ComparisonSelector';
 import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
-import ComparisonItem from '../components/Comparison/ComparisonItem';
+import ComparisonItem from '../components/Comparison/ComparisonItem'; // ComparisonItem now uses universal visualizer
 import LoadingSpinner from '../components/Common/LoadingSpinner';
 import ErrorMessage from '../components/Common/ErrorMessage';
 import { fetchAllHistory, resetHistoryError } from '../store/slices/historySlice';
 
 const ComparisonPage = () => {
     const dispatch = useDispatch();
+    // Use allHistory which contains processed entries of all types
     const { allHistory, allHistoryStatus, error: historyError } = useSelector((state) => state.history);
     // Store IDs of the routes selected for comparison
     const [selectedRouteIds, setSelectedRouteIds] = useState([]);
@@ -22,9 +22,7 @@ const ComparisonPage = () => {
             dispatch(fetchAllHistory());
         }
         // Optional: Reset error on unmount
-        return () => {
-            // dispatch(resetHistoryError());
-        };
+        // return () => { dispatch(resetHistoryError()); };
     }, [allHistoryStatus, dispatch]);
 
     // Handler for when the selection in ComparisonSelector changes
@@ -57,7 +55,7 @@ const ComparisonPage = () => {
                 <>
                     {/* Component to select routes from the available history */}
                     <ComparisonSelector
-                        availableRoutes={allHistory}
+                        availableRoutes={allHistory} // Pass all history entries
                         selectedIds={selectedRouteIds}
                         onChange={handleSelectionChange}
                     />
@@ -68,7 +66,7 @@ const ComparisonPage = () => {
                              {/* Container responsible for laying out the comparison items */}
                              <RouteComparisonContainer
                                 traces={selectedRoutesData} // Pass the filtered historical data
-                                SectionComponent={ComparisonItem} // Specify the component to render each trace
+                                SectionComponent={ComparisonItem} // ComparisonItem renders HistoryTraceVisualizer internally
                              />
                          </Box>
                     ) : (
@@ -79,7 +77,7 @@ const ComparisonPage = () => {
                             variant="outlined" // Use outlined for less emphasis
                             sx={{ mt: 3 }}
                          >
-                            Select two or more routes from the list above to compare them side-by-side.
+                            Select two or more routes (Combined, Direct, or MAC) from the list above to compare them side-by-side.
                          </Alert>
                     )}
                 </>

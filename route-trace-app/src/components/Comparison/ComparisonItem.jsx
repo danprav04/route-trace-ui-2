@@ -1,12 +1,12 @@
-// ----- File: src\components\Comparison\ComparisonItem.jsx -----
 import React from 'react';
-import { Paper, Box, Typography } from '@mui/material';
-import HistoryRouteVisualizer from './HistoryRouteVisualizer';
+import { Paper } from '@mui/material';
+import HistoryTraceVisualizer from './HistoryTraceVisualizer'; // Use the universal visualizer
 
 // This component acts as a container for a single historical trace within the comparison view.
-const ComparisonItem = ({ trace: route }) => {
-    // route prop comes from ComparisonPage, which is historical data
-    if (!route) return null;
+// It now receives a processed history entry which includes the trace_type.
+const ComparisonItem = ({ trace }) => {
+    // 'trace' prop comes from ComparisonPage, which is historical data processed by historySlice
+    if (!trace) return null;
 
     return (
         // Use Paper for consistent styling with other sections
@@ -21,15 +21,9 @@ const ComparisonItem = ({ trace: route }) => {
                 flexDirection: 'column'
             }}
         >
-            {/* Optional Header: Display basic info, kept minimal */}
-            {/* <Box sx={{ mb: 1, pb: 1, borderBottom: 1, borderColor: 'divider' }}>
-                <Typography variant="caption" color="text.secondary">
-                    Trace ID: {route.id} | {route.user?.username || 'N/A'} | {formatTimestamp(route.timestamp, 'short')}
-                </Typography>
-            </Box> */}
-
             {/* The main visualizer for the historical route */}
-            <HistoryRouteVisualizer route={route} />
+            {/* Pass the full trace object to the universal visualizer */}
+            <HistoryTraceVisualizer route={trace} />
         </Paper>
     );
 };

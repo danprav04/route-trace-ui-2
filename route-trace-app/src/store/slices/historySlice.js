@@ -1,4 +1,3 @@
-// ----- File: src\store\slices\historySlice.js -----
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import routeService from '../../services/routeService';
 
@@ -6,37 +5,48 @@ import routeService from '../../services/routeService';
 const safeParseJson = (jsonString, defaultValue = null) => {
   // If it's already an object (e.g., already parsed), return it directly
   if (typeof jsonString === 'object' && jsonString !== null) return jsonString;
-  // If it's not a string, return the default value
+  // If it's not a string or empty/whitespace, return the default value
   if (typeof jsonString !== 'string' || jsonString.trim() === '') return defaultValue;
 
   try {
-    const parsed = JSON.parse(jsonString);
-    // Basic check if parsed result is an array (for routeData)
-    // Adjust check if other structures are expected
-    if (Array.isArray(parsed)) {
-        return parsed;
-    } else if (typeof parsed === 'object' && parsed !== null) { // For deviceInfo
-         return parsed;
-    }
-    // If parsed into something unexpected (e.g., a primitive), return default
-    return defaultValue;
+    // Don't check type after parsing, just return the parsed result
+    return JSON.parse(jsonString);
   } catch (e) {
     // Log parsing errors for debugging, but don't crash the app
-    console.warn("Failed to parse JSON string:", jsonString, "Error:", e);
+    console.warn("Failed to parse JSON string:", jsonString?.substring(0, 100) + "...", "Error:", e); // Log only start of long strings
     return defaultValue; // Return default value on parsing failure
   }
 };
 
 // Helper to process raw route entries from the backend
-const processRouteEntry = (route) => ({
-    ...route,
-    // Parse the 'route' field (expected List[DetailedHop] as JSON string)
-    routeData: safeParseJson(route.route, []), // Default to empty array if parsing fails or invalid
-    // Parse the 'device_additional_info' field (expected JSON object string or null)
-    deviceInfo: safeParseJson(route.device_additional_info, null), // Default to null
-    // Ensure user is an object or null
-    user: (typeof route.user === 'object' && route.user !== null) ? route.user : null
-});
+const processRouteEntry = (route) => {
+    // Ensure default values are appropriate (e.g., [] for hop lists, null for objects)
+    const mainRouteTrace = safeParseJson(route.main_route_trace, []);
+    const sourceMacTrace = safeParseJson(route.source_mac_trace, []);
+    const destinationMacTrace = safeParseJson(route.destination_mac_trace, []);
+    const inputDetails = safeParseJson(route.input_details, null);
+
+    // Basic validation: ensure parsed hop traces are arrays
+    const validMainRoute = Array.isArray(mainRouteTrace) ? mainRouteTrace : [];
+    const validSourceMac = Array.isArray(sourceMacTrace) ? sourceMacTrace : [];
+    const validDestMac = Array.isArray(destinationMacTrace) ? destinationMacTrace : [];
+
+    return {
+        ...route, // Include id, source, destination, trace_type, timestamp, user
+        mainRouteTrace: validMainRoute,
+        sourceMacTrace: validSourceMac,
+        destinationMacTrace: validDestMac,
+        inputDetails: (typeof inputDetails === 'object') ? inputDetails : null, // Ensure inputDetails is object or null
+        // Keep original user object structure
+        user: (typeof route.user === 'object' && route.user !== null) ? route.user : null,
+        // Deprecated fields removed/replaced
+        route: undefined, // Remove old 'route' field
+        routeData: undefined, // Remove old 'routeData' field
+        deviceInfo: undefined, // Remove old 'deviceInfo' field
+        device_additional_info: undefined // Remove original backend field name
+    };
+};
+
 
 // Async thunk for fetching user-specific route history
 export const fetchUserHistory = createAsyncThunk(

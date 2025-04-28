@@ -614,6 +614,7 @@ Disallow:
 // ----- File: src\App.js -----
 
 // ----- File: src\App.js -----
+// ----- File: src\App.js -----
 import React, { useState, useMemo } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import {
@@ -776,6 +777,8 @@ function App() {
 }
 
 export default App;
+
+// ----- End File: src\App.js -----
 
 // ----- End File: src\App.js -----
 
@@ -1098,6 +1101,7 @@ export default Navbar;
 
 // ----- File: src\components\Common\Sidebar.jsx -----
 
+// ----- File: src\components\Common\Sidebar.jsx -----
 // ----- File: src\components\Common\Sidebar.jsx -----
 import React from 'react';
 import { useDispatch } from 'react-redux';
@@ -1818,194 +1822,133 @@ export default HistoryList;
 // ----- File: src\components\RouteTrace\DirectRouteTraceInputForm.jsx -----
 
 // ----- File: src\components\RouteTrace\DirectRouteTraceInputForm.jsx -----
-// Update Grid component to use Grid v2 API
+// ----- File: src\components\RouteTrace\DirectRouteTraceInputForm.jsx -----
 import React from 'react';
 import { useDispatch } from 'react-redux';
-import { TextField, Button, Box, Grid, CircularProgress, Tooltip, IconButton, InputAdornment, Typography } from '@mui/material';
+import { TextField, Button, Box, Grid, CircularProgress, Tooltip, Typography, Paper } from '@mui/material'; // Added Paper
 import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
-import SyncIcon from '@mui/icons-material/Sync';
-import SyncProblemIcon from '@mui/icons-material/SyncProblem';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import EditIcon from '@mui/icons-material/Edit';
-import { updateDirectTraceInput, fetchDirectDefaultGateway, performDirectRouteTrace } from '../../store/slices/directRouteSlice';
+import { updateDirectTraceInput, performDirectRouteTrace } from '../../store/slices/directRouteSlice';
 import ErrorMessage from '../Common/ErrorMessage';
 
 const DirectRouteTraceInputForm = ({ trace }) => {
   const dispatch = useDispatch();
   const {
     id: traceId,
-    sourceIp, destinationIp, sourceDg, destinationDg, vrf,
-    sourceDgStatus, destinationDgStatus, traceStatus, error
+    sourceDg, destinationDg, vrf,
+    traceStatus, error
   } = trace;
 
   const handleInputChange = (field) => (event) => {
     dispatch(updateDirectTraceInput({ traceId, field, value: event.target.value }));
   };
 
-  const handleFetchDg = (type) => () => {
-    const ip = type === 'source' ? sourceIp : destinationIp;
-    if (ip) {
-      dispatch(fetchDirectDefaultGateway({ ip, type, traceId }));
-    }
-  };
-
   const handleTrace = () => {
-    dispatch(performDirectRouteTrace({ traceId, sourceIp, destinationIp, sourceDg, destinationDg, vrf }));
-  };
-
-  const isFetchingSourceDg = sourceDgStatus === 'loading';
-  const isFetchingDestDg = destinationDgStatus === 'loading';
-  const isTracing = traceStatus === 'loading';
-
-  // Disable DG field only when actively fetching that specific DG
-  const sourceDgDisabled = isFetchingSourceDg;
-  const destDgDisabled = isFetchingDestDg;
-
-  const renderDgStatusIcon = (status, type) => {
-    const ip = type === 'source' ? sourceIp : destinationIp;
-    const handleRetry = handleFetchDg(type);
-
-    switch (status) {
-      case 'loading':
-        return <InputAdornment position="end"><CircularProgress size={20} sx={{ mr: 1 }} /></InputAdornment>;
-      case 'succeeded':
-        return <InputAdornment position="end"><Tooltip title="Gateway automatically fetched"><CheckCircleIcon color="success" sx={{ mr: 1 }} /></Tooltip></InputAdornment>;
-      case 'failed':
-        return (
-            <InputAdornment position="end">
-                <Tooltip title="Failed to fetch gateway. Click to retry.">
-                    <IconButton onClick={handleRetry} size="small" disabled={!ip || isTracing} sx={{ mr: 0.5 }}>
-                        <SyncProblemIcon color="error" />
-                    </IconButton>
-                </Tooltip>
-            </InputAdornment>
-        );
-      case 'manual':
-         return <InputAdornment position="end"><Tooltip title="Gateway manually entered"><EditIcon color="action" sx={{ mr: 1 }} /></Tooltip></InputAdornment>;
-      default: // idle
-        return ( // Show refresh button when idle and IP exists
-             ip ? <InputAdornment position="end">
-                 <Tooltip title="Fetch Gateway">
-                     <IconButton onClick={handleRetry} size="small" disabled={isTracing} sx={{ mr: 0.5 }}> <SyncIcon /> </IconButton>
-                 </Tooltip>
-             </InputAdornment> : null
-        );
+    if (!sourceDg || !destinationDg || !vrf) {
+        return;
     }
+    dispatch(performDirectRouteTrace({ traceId, sourceDg, destinationDg, vrf }));
   };
 
-  // Check if there's a general DG fetch error to display
-  const dgFetchError = error && (sourceDgStatus === 'failed' || destinationDgStatus === 'failed');
-  // Check if trace failed (but not DG fetch error)
-  const traceError = error && traceStatus === 'failed' && !dgFetchError;
+  const isTracing = traceStatus === 'loading';
+  const traceError = error && traceStatus === 'failed';
 
-  const canTrace = sourceIp && destinationIp && sourceDg && destinationDg && !isTracing && !isFetchingSourceDg && !isFetchingDestDg;
+  // Validation checks for visual error state and button disabling
+  const canTrace = sourceDg && destinationDg && vrf && !isTracing;
+  const vrfError = (!vrf && (sourceDg || destinationDg)) || (!!error && error.includes("VRF Name"));
+  const sourceDgError = !!error && error.includes("Source Gateway IP");
+  const destDgError = !!error && error.includes("Destination Gateway IP");
+
+  // Use a consistent helper text space or remove it entirely if not needed often
+  const defaultHelperText = " "; // Reserve space even when no text
 
   return (
-    <Box component="form" noValidate autoComplete="off" onSubmit={(e) => { e.preventDefault(); if(canTrace) handleTrace(); }}>
-        {/* Display DG fetch errors prominently */}
-        {dgFetchError && <ErrorMessage error={error} title="Gateway Fetch Error" />}
-        {/* Display general trace errors separately */}
-        {traceError && <ErrorMessage error={error} title="Trace Error" />}
+    // Wrap form content in Paper for visual grouping like the image
+    <Paper elevation={0} variant="outlined" sx={{ p: { xs: 2, sm: 3 }, borderRadius: 1.5, backgroundColor: 'action.hover' }}>
+        <Box component="form" noValidate autoComplete="off" onSubmit={(e) => { e.preventDefault(); if(canTrace) handleTrace(); }}>
+            {/* Display general trace errors inside the Paper, above the inputs */}
+            {traceError && <ErrorMessage error={error} title="Trace Error" />}
 
-        {/* Grid v2: No 'item' prop, use direct breakpoint props */}
-        <Grid container spacing={2} alignItems="flex-start">
-            {/* Source Column */}
-            {/* Removed 'item' prop */}
-            <Grid xs={12} md={6}>
-                <Typography variant="subtitle2" gutterBottom sx={{ color: 'primary.main' }}>Source</Typography>
-                <TextField
-                    label="Source IP Address"
-                    value={sourceIp}
-                    onChange={handleInputChange('sourceIp')}
-                    onBlur={handleFetchDg('source')} // Fetch DG when field loses focus
-                    variant="outlined"
-                    fullWidth
-                    required
-                    disabled={isTracing}
-                    margin="dense" // Use dense margin
-                    error={!!(dgFetchError && sourceDgStatus === 'failed')} // Highlight if source DG fetch failed
-                />
-                <TextField
-                    label="Source Default Gateway"
-                    value={sourceDg}
-                    onChange={handleInputChange('sourceDg')}
-                    variant="outlined"
-                    fullWidth
-                    required
-                    disabled={sourceDgDisabled || isTracing}
-                    margin="dense" // Use dense margin
-                    InputProps={{
-                        endAdornment: renderDgStatusIcon(sourceDgStatus, 'source'),
-                    }}
-                    error={!!(dgFetchError && sourceDgStatus === 'failed')} // Highlight if source DG fetch failed
-                    helperText={sourceDgStatus === 'failed' ? "Check IP and network connectivity" : "Enter DG or fetch automatically"}
-                />
+            {/* Grid container for Source/Destination Gateway side-by-side */}
+            <Grid container spacing={{ xs: 2, md: 3 }} sx={{ mb: 2 }}> {/* Add bottom margin */}
+                {/* Source Gateway Column */}
+                <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" gutterBottom sx={{ color: 'primary.main', fontWeight: 'medium' }}>
+                        Source Gateway
+                    </Typography>
+                    <TextField
+                        label="Source Gateway IP *" // Add asterisk in label
+                        value={sourceDg}
+                        onChange={handleInputChange('sourceDg')}
+                        variant="outlined"
+                        fullWidth
+                        required // HTML5 required (though validation mainly in JS/Thunk)
+                        disabled={isTracing}
+                        margin="dense"
+                        error={sourceDgError}
+                        helperText={sourceDgError ? "Required" : "Enter the starting Gateway IP for the trace"}
+                    />
+                </Grid>
+
+                {/* Destination Gateway Column */}
+                <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" gutterBottom sx={{ color: 'secondary.main', fontWeight: 'medium' }}>
+                        Destination Gateway
+                    </Typography>
+                    <TextField
+                        label="Destination Gateway IP *" // Add asterisk in label
+                        value={destinationDg}
+                        onChange={handleInputChange('destinationDg')}
+                        variant="outlined"
+                        fullWidth
+                        required
+                        disabled={isTracing}
+                        margin="dense"
+                        error={destDgError}
+                        helperText={destDgError ? "Required" : "Enter the ending Gateway IP for the trace"}
+                    />
+                </Grid>
             </Grid>
 
-            {/* Destination Column */}
-            {/* Removed 'item' prop */}
-            <Grid xs={12} md={6}>
-                <Typography variant="subtitle2" gutterBottom sx={{ color: 'secondary.main' }}>Destination</Typography>
-                 <TextField
-                    label="Destination IP Address"
-                    value={destinationIp}
-                    onChange={handleInputChange('destinationIp')}
-                    onBlur={handleFetchDg('destination')}
-                    variant="outlined"
-                    fullWidth
-                    required
-                    disabled={isTracing}
-                    margin="dense" // Use dense margin
-                    error={!!(dgFetchError && destinationDgStatus === 'failed')} // Highlight if dest DG fetch failed
-                 />
-                 <TextField
-                    label="Destination Default Gateway"
-                    value={destinationDg}
-                    onChange={handleInputChange('destinationDg')}
-                    variant="outlined"
-                    fullWidth
-                    required
-                    disabled={destDgDisabled || isTracing}
-                    margin="dense" // Use dense margin
-                    InputProps={{
-                         endAdornment: renderDgStatusIcon(destinationDgStatus, 'destination'),
-                    }}
-                    error={!!(dgFetchError && destinationDgStatus === 'failed')} // Highlight if dest DG fetch failed
-                    helperText={destinationDgStatus === 'failed' ? "Check IP and network connectivity" : "Enter DG or fetch automatically"}
-                />
-            </Grid>
-
-             {/* VRF Input - spans full width below */}
-             {/* Removed 'item' prop */}
-             <Grid xs={12}>
-                 <TextField
-                    label="VRF Name (Optional)"
-                    value={vrf || ''} // Ensure controlled component
+            {/* VRF Input - Full width below the gateway columns */}
+            <Box sx={{ mb: 3 }}> {/* Add bottom margin before button */}
+                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'medium' }}>
+                     VRF Name
+                </Typography>
+                <TextField
+                    label="VRF Name *" // Add asterisk in label
+                    value={vrf || ''}
                     onChange={handleInputChange('vrf')}
                     variant="outlined"
                     fullWidth
+                    required
                     disabled={isTracing}
-                    margin="dense" // Use dense margin
-                    helperText="Specify VRF context for the trace if applicable"
-                 />
-            </Grid>
-        </Grid>
+                    margin="dense"
+                    error={vrfError}
+                    helperText={vrfError ? "Required" : "Specify the VRF context for this trace (Required)"}
+                />
+            </Box>
 
-        {/* Trace Button */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 1 }}>
-            <Button
-                variant="contained"
-                color="primary"
-                size="large"
-                startIcon={isTracing ? <CircularProgress size={20} color="inherit" /> : <NetworkCheckIcon />}
-                onClick={handleTrace}
-                disabled={!canTrace}
-                type="submit" // Allow form submission via Enter key
-            >
-                {isTracing ? 'Tracing...' : 'Trace Direct Route'}
-            </Button>
+            {/* Trace Button - Centered */}
+            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <Tooltip title={!canTrace ? "Please fill in all required fields (Source/Dest Gateway IP, VRF)" : "Run direct trace"}>
+                    <span> {/* Wrap button for tooltip when disabled */}
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            size="large"
+                            startIcon={isTracing ? <CircularProgress size={20} color="inherit" /> : <NetworkCheckIcon />}
+                            onClick={handleTrace}
+                            disabled={!canTrace}
+                            type="submit" // Allow form submission via Enter key
+                            sx={{ minWidth: 180 }} // Give button a minimum width
+                        >
+                            {isTracing ? 'Tracing...' : 'Trace Direct Route'}
+                        </Button>
+                    </span>
+                </Tooltip>
+            </Box>
         </Box>
-    </Box>
+    </Paper>
   );
 };
 
@@ -2016,6 +1959,7 @@ export default DirectRouteTraceInputForm;
 
 // ----- File: src\components\RouteTrace\DirectRouteTraceSection.jsx -----
 
+// ----- File: src\components\RouteTrace\DirectRouteTraceSection.jsx -----
 // ----- File: src\components\RouteTrace\DirectRouteTraceSection.jsx -----
 import React from 'react';
 import { Paper, Box, IconButton, Tooltip, Divider } from '@mui/material';
@@ -2083,8 +2027,11 @@ export default DirectRouteTraceSection;
 
 // ----- End File: src\components\RouteTrace\DirectRouteTraceSection.jsx -----
 
+// ----- End File: src\components\RouteTrace\DirectRouteTraceSection.jsx -----
+
 // ----- File: src\components\RouteTrace\DirectRouteVisualizer.jsx -----
 
+// ----- File: src\components\RouteTrace\DirectRouteVisualizer.jsx -----
 // ----- File: src\components\RouteTrace\DirectRouteVisualizer.jsx -----
 import React from 'react';
 import { Box, Typography, Stack, Paper, Chip, Divider } from '@mui/material';
@@ -2094,18 +2041,19 @@ import HopDisplay from './HopDisplay';
 
 const DirectRouteVisualizer = ({ trace }) => {
   const {
-    sourceIp, destinationIp, sourceDg, destinationDg, vrf,
-    traceResult,
+    // sourceIp, destinationIp removed
+    sourceDg, destinationDg, vrf, // Using Gateway IPs now
+    traceResult, // This should hold the List[DetailedHop] from the backend
     traceStatus,
     error
   } = trace;
 
   const isLoading = traceStatus === 'loading';
-  // Separate DG fetch errors from trace errors for display
-  const isDgError = error && (trace.sourceDgStatus === 'failed' || trace.destinationDgStatus === 'failed');
-  const isTraceError = error && traceStatus === 'failed' && !isDgError;
+  // Dg fetch errors are removed
+  const isTraceError = error && traceStatus === 'failed';
   const displayError = isTraceError; // Only display trace error here
 
+  // Use traceResult which holds the array of hops
   const hasResults = traceResult && traceResult.length > 0;
 
   // Don't render anything in idle state unless there's an error already
@@ -2137,7 +2085,7 @@ const DirectRouteVisualizer = ({ trace }) => {
       {/* Display results container only if not loading and no specific trace error */}
       {!isLoading && !displayError && (
         <Paper elevation={0} variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
-          {/* Header: Source Info -> Destination Info */}
+          {/* Header: Source Gateway -> Destination Gateway */}
           <Stack
              direction={{ xs: 'column', sm: 'row' }}
              justifyContent="space-around"
@@ -2145,22 +2093,24 @@ const DirectRouteVisualizer = ({ trace }) => {
              spacing={2}
              sx={{ mb: 2, textAlign: 'center' }}
           >
-              {/* Source Box */}
+              {/* Source Gateway Box */}
               <Paper elevation={0} sx={{ p: 1.5, flexGrow: 1, border: 1, borderColor: 'primary.light', borderRadius: 1 }}>
-                  <Typography variant="overline" display="block" sx={{ lineHeight: 1.2, color: 'primary.main' }}>Source</Typography>
-                  <Typography variant="body2" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{sourceIp || 'N/A'}</Typography>
-                  <Typography variant="caption" display="block" sx={{ wordBreak: 'break-all', color: 'text.secondary' }}>DG: {sourceDg || 'N/A'}</Typography>
+                  <Typography variant="overline" display="block" sx={{ lineHeight: 1.2, color: 'primary.main' }}>Source Gateway</Typography>
+                  {/* Display Source Gateway IP */}
+                  <Typography variant="body2" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{sourceDg || 'N/A'}</Typography>
+                   {/* Removed original source IP display */}
               </Paper>
 
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                  <Typography variant="h5" sx={{ color: 'text.secondary', transform: { xs: 'rotate(90deg)', sm: 'none'} }}>→</Typography>
               </Box>
 
-              {/* Destination Box */}
+              {/* Destination Gateway Box */}
               <Paper elevation={0} sx={{ p: 1.5, flexGrow: 1, border: 1, borderColor: 'secondary.light', borderRadius: 1 }}>
-                  <Typography variant="overline" display="block" sx={{ lineHeight: 1.2, color: 'secondary.main' }}>Destination</Typography>
-                  <Typography variant="body2" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{destinationIp || 'N/A'}</Typography>
-                  <Typography variant="caption" display="block" sx={{ wordBreak: 'break-all', color: 'text.secondary' }}>DG: {destinationDg || 'N/A'}</Typography>
+                  <Typography variant="overline" display="block" sx={{ lineHeight: 1.2, color: 'secondary.main' }}>Destination Gateway</Typography>
+                  {/* Display Destination Gateway IP */}
+                  <Typography variant="body2" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{destinationDg || 'N/A'}</Typography>
+                   {/* Removed original destination IP display */}
               </Paper>
           </Stack>
 
@@ -2194,7 +2144,7 @@ const DirectRouteVisualizer = ({ trace }) => {
              // Show message only if trace succeeded but returned no hops
              traceStatus === 'succeeded' && (
                 <Typography align="center" color="text.secondary" sx={{ my: 3, fontStyle: 'italic' }}>
-                    No route trace hops were returned between the specified points.
+                    No route trace hops were returned between the specified gateways in VRF '{vrf}'.
                 </Typography>
              )
           )}
@@ -2205,6 +2155,8 @@ const DirectRouteVisualizer = ({ trace }) => {
 };
 
 export default DirectRouteVisualizer;
+
+// ----- End File: src\components\RouteTrace\DirectRouteVisualizer.jsx -----
 
 // ----- End File: src\components\RouteTrace\DirectRouteVisualizer.jsx -----
 
@@ -3696,6 +3648,7 @@ export default ComparisonPage;
 // ----- File: src\pages\DirectRouteTracePage.jsx -----
 
 // ----- File: src\pages\DirectRouteTracePage.jsx -----
+// ----- File: src\pages\DirectRouteTracePage.jsx -----
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Button, Box, Typography, Tooltip } from '@mui/material';
@@ -3756,6 +3709,8 @@ const DirectRouteTracePage = () => {
 };
 
 export default DirectRouteTracePage;
+
+// ----- End File: src\pages\DirectRouteTracePage.jsx -----
 
 // ----- End File: src\pages\DirectRouteTracePage.jsx -----
 
@@ -4122,6 +4077,7 @@ export default authService;
 
 // ----- File: src\services\routeService.js -----
 
+// ----- File: src\services\routeService.js -----
 import apiClient from './api';
 
 // Corresponds to get_default_gateway(ip: str)
@@ -4155,21 +4111,21 @@ const getMacTrace = async (ip, dg) => {
 
 // Corresponds to get_route_trace (or potentially get_tufin_route - clarify which one to use)
 // Using get_route_trace based on code snippets provided
-const getRouteTrace = async (source_ip, destination_ip, source_dg = null, destination_dg = null, source_dg_name = null, destination_dg_name = null, vrf = null, destination_vrf = null) => {
+// This function now handles both the combined trace (DGs provided for MAC tracing)
+// and the direct trace (DGs provided as start/end points, VRF optional)
+const getRouteTrace = async (source_ip, destination_ip, source_dg = null, destination_dg = null, vrf = null) => {
     try {
         const params = {
             source_ip,
             destination_ip,
-            // Add other params only if they have values
+            // Add other params only if they have values (not null/undefined)
             ...(source_dg && { source_dg }),
             ...(destination_dg && { destination_dg }),
-            ...(source_dg_name && { source_dg_name }),
-            ...(destination_dg_name && { destination_dg_name }),
             ...(vrf && { vrf }),
-            ...(destination_vrf && { destination_vrf }),
         };
+        // Endpoint should match the modified dummy backend or real backend
         const response = await apiClient.get('/get-route-trace', { params });
-         // Backend saves automatically, frontend just gets the result.
+         // Backend saves automatically (in dummy/real logic), frontend just gets the result.
          // Assuming backend returns the full route trace data (e.g., list of hops)
         return response.data; // Modify based on actual backend response structure
     } catch (error) {
@@ -4216,6 +4172,8 @@ const routeService = {
 };
 
 export default routeService;
+
+// ----- End File: src\services\routeService.js -----
 
 // ----- End File: src\services\routeService.js -----
 
@@ -4301,20 +4259,20 @@ export default authSlice.reducer;
 // ----- File: src\store\slices\directRouteSlice.js -----
 
 // ----- File: src\store\slices\directRouteSlice.js -----
+// ----- File: src\store\slices\directRouteSlice.js -----
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import routeService from '../../services/routeService';
 import { v4 as uuidv4 } from 'uuid';
 
-// Helper to create initial trace state for Direct Route trace
+// Helper to create initial trace state for Direct Route trace (Simplified)
 const createInitialDirectTraceState = () => ({
   id: uuidv4(),
-  sourceIp: '',
-  destinationIp: '',
-  sourceDg: '',
-  destinationDg: '',
-  vrf: '', // Add VRF field
-  sourceDgStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed', 'manual'
-  destinationDgStatus: 'idle',
+  // sourceIp: '', // Removed
+  // destinationIp: '', // Removed
+  sourceDg: '', // Represents Source Gateway IP
+  destinationDg: '', // Represents Destination Gateway IP
+  vrf: '', // VRF is required
+  // DgStatus fields removed as auto-fetch is removed
   traceStatus: 'idle', // 'idle', 'loading', 'succeeded', 'failed'
   traceResult: null, // Holds List[DetailedHop] for the direct route trace
   error: null, // Holds error message string or object
@@ -4322,36 +4280,27 @@ const createInitialDirectTraceState = () => ({
 
 // --- Async Thunks ---
 
-export const fetchDirectDefaultGateway = createAsyncThunk(
-  'directRoute/fetchDefaultGateway',
-  async ({ ip, type, traceId }, { rejectWithValue }) => {
-    // Basic IP validation could be added here
-    if (!ip) return rejectWithValue({ message: "IP address is required to fetch gateway.", type, traceId });
-    try {
-      const gateway = await routeService.getDefaultGateway(ip);
-      // Handle case where backend returns empty/null gateway gracefully
-      if (!gateway) throw new Error("No gateway address returned by the backend.");
-      return { gateway, type, traceId };
-    } catch (error) {
-      // Standardize error message format
-      const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to fetch default gateway';
-      return rejectWithValue({ message: errorMessage, type, traceId });
-    }
-  }
-);
+// Removed fetchDirectDefaultGateway thunk as it's no longer needed
 
 export const performDirectRouteTrace = createAsyncThunk(
   'directRoute/performDirectRouteTrace',
-  async ({ traceId, sourceIp, destinationIp, sourceDg, destinationDg, vrf }, { rejectWithValue }) => {
-    // Input validation
-    if (!sourceIp || !destinationIp || !sourceDg || !destinationDg) {
-        return rejectWithValue({ message: "Source IP, Destination IP, Source DG, and Destination DG are required.", traceId });
+  async ({ traceId, sourceDg, destinationDg, vrf }, { rejectWithValue }) => {
+    // Input validation - VRF is now considered mandatory here
+    // sourceDg and destinationDg are the primary inputs now
+    if (!sourceDg || !destinationDg || !vrf || vrf.trim() === '') {
+        return rejectWithValue({ message: "Source Gateway IP, Destination Gateway IP, and VRF Name are required.", traceId });
     }
     try {
-      // Ensure VRF is passed correctly (null or string)
-      const traceVrf = vrf && vrf.trim() !== '' ? vrf.trim() : null;
+      // Trim VRF just in case
+      const traceVrf = vrf.trim();
+      // Call the main routeService.getRouteTrace function.
+      // Pass Gateway IPs as both endpoint IPs and gateway IPs for this trace type.
       const result = await routeService.getRouteTrace(
-          sourceIp, destinationIp, sourceDg, destinationDg, null, null, traceVrf
+          sourceDg,       // Pass Source Gateway as source_ip
+          destinationDg,  // Pass Dest Gateway as destination_ip
+          sourceDg,       // Pass Source Gateway as source_dg
+          destinationDg,  // Pass Dest Gateway as destination_dg
+          traceVrf        // Pass VRF
       );
       // Assuming result is List[DetailedHop] or could be empty list
       return { traceId, result: result || [] }; // Ensure result is always an array
@@ -4373,16 +4322,13 @@ const directRouteSlice = createSlice({
   initialState,
   reducers: {
     addDirectTraceSection: (state) => {
-       // Limit the number of sections for performance/UI reasons
        const MAX_SECTIONS = 4; // Example limit
        if (state.traces.length < MAX_SECTIONS) {
          state.traces.push(createInitialDirectTraceState());
        }
-       // Optionally, provide feedback if limit is reached (e.g., via a separate state flag or UI component)
     },
     removeDirectTraceSection: (state, action) => {
         const traceIdToRemove = action.payload;
-        // Prevent removing the last section
         if (state.traces.length > 1) {
             state.traces = state.traces.filter(trace => trace.id !== traceIdToRemove);
         }
@@ -4391,29 +4337,15 @@ const directRouteSlice = createSlice({
       const { traceId, field, value } = action.payload;
       const traceIndex = state.traces.findIndex(t => t.id === traceId);
       if (traceIndex !== -1) {
-        const trace = state.traces[traceIndex];
-        trace[field] = value;
+        // Only update allowed fields: sourceDg, destinationDg, vrf
+        if (['sourceDg', 'destinationDg', 'vrf'].includes(field)) {
+            const trace = state.traces[traceIndex];
+            trace[field] = value;
 
-        // Reset status and results if relevant inputs change
-        trace.traceStatus = 'idle';
-        trace.traceResult = null;
-        trace.error = null; // Clear general error on input change
-
-        // Logic for DG status when inputs change
-        if (field === 'sourceDg' && trace.sourceDgStatus !== 'loading') {
-            trace.sourceDgStatus = 'manual'; // Mark as manual if user types in DG field
-        }
-        if (field === 'destinationDg' && trace.destinationDgStatus !== 'loading') {
-            trace.destinationDgStatus = 'manual';
-        }
-        // If IP changes, reset the corresponding DG field and status
-        if (field === 'sourceIp') {
-            trace.sourceDg = '';
-            trace.sourceDgStatus = 'idle';
-        }
-        if (field === 'destinationIp') {
-            trace.destinationDg = '';
-            trace.destinationDgStatus = 'idle';
+            // Reset status and results if relevant inputs change
+            trace.traceStatus = 'idle';
+            trace.traceResult = null;
+            trace.error = null; // Clear general error on input change
         }
       }
     },
@@ -4424,46 +4356,7 @@ const directRouteSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // --- Default Gateway Fetching Reducers ---
-      .addCase(fetchDirectDefaultGateway.pending, (state, action) => {
-        const { type, traceId } = action.meta.arg;
-        const trace = state.traces.find(t => t.id === traceId);
-        if (trace) {
-          if (type === 'source') trace.sourceDgStatus = 'loading';
-          if (type === 'destination') trace.destinationDgStatus = 'loading';
-          trace.error = null; // Clear previous errors when starting fetch
-        }
-      })
-      .addCase(fetchDirectDefaultGateway.fulfilled, (state, action) => {
-        const { gateway, type, traceId } = action.payload;
-        const trace = state.traces.find(t => t.id === traceId);
-        if (trace) {
-          if (type === 'source') {
-              trace.sourceDg = gateway;
-              trace.sourceDgStatus = 'succeeded';
-          }
-          if (type === 'destination') {
-              trace.destinationDg = gateway;
-              trace.destinationDgStatus = 'succeeded';
-          }
-           // Clear error state if DG fetch was the cause of a previous error
-           if (trace.error?.includes('Failed to fetch default gateway')) {
-               trace.error = null;
-           }
-        }
-      })
-      .addCase(fetchDirectDefaultGateway.rejected, (state, action) => {
-        const { message, type, traceId } = action.payload;
-        const trace = state.traces.find(t => t.id === traceId);
-         if (trace) {
-          if (type === 'source') trace.sourceDgStatus = 'failed';
-          if (type === 'destination') trace.destinationDgStatus = 'failed';
-          // Set specific error related to DG fetch
-          trace.error = `Gateway Fetch Error (${type}): ${message}`;
-          // Reset trace status if a DG fetch fails while a trace was in progress/succeeded
-          // trace.traceStatus = 'idle'; // Optional: Reset trace status?
-        }
-      })
+      // Removed fetchDirectDefaultGateway reducers
 
       // --- Direct Route Trace Execution Reducers ---
       .addCase(performDirectRouteTrace.pending, (state, action) => {
@@ -4498,6 +4391,8 @@ const directRouteSlice = createSlice({
 
 export const { addDirectTraceSection, removeDirectTraceSection, updateDirectTraceInput, resetDirectTraceState } = directRouteSlice.actions;
 export default directRouteSlice.reducer;
+
+// ----- End File: src\store\slices\directRouteSlice.js -----
 
 // ----- End File: src\store\slices\directRouteSlice.js -----
 
@@ -5056,6 +4951,7 @@ export default routeTraceSlice.reducer;
 
 // ----- File: src\store\store.js -----
 
+// ----- File: src\store\store.js -----
 // ----- File: src/store/store.js -----
 
 import { configureStore } from '@reduxjs/toolkit';
@@ -5079,6 +4975,7 @@ const store = configureStore({
 export default store;
 
 // ----- End File: src/store/store.js -----
+// ----- End File: src\store\store.js -----
 
 // ----- End File: src\store\store.js -----
 
