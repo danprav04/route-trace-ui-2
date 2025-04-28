@@ -17,7 +17,7 @@ route-trace-app/
 │   │   ├── Comparison
 │   │   │   ├── ComparisonItem.jsx
 │   │   │   ├── ComparisonSelector.jsx
-│   │   │   └── HistoryRouteVisualizer.jsx
+│   │   │   └── HistoryTraceVisualizer.jsx
 │   │   ├── History
 │   │   │   ├── HistoryItem.jsx
 │   │   │   └── HistoryList.jsx
@@ -1284,15 +1284,15 @@ export default Sidebar;
 
 // ----- File: src\components\Comparison\ComparisonItem.jsx -----
 
-// ----- File: src\components\Comparison\ComparisonItem.jsx -----
 import React from 'react';
-import { Paper, Box, Typography } from '@mui/material';
-import HistoryRouteVisualizer from './HistoryRouteVisualizer';
+import { Paper } from '@mui/material';
+import HistoryTraceVisualizer from './HistoryTraceVisualizer'; // Use the universal visualizer
 
 // This component acts as a container for a single historical trace within the comparison view.
-const ComparisonItem = ({ trace: route }) => {
-    // route prop comes from ComparisonPage, which is historical data
-    if (!route) return null;
+// It now receives a processed history entry which includes the trace_type.
+const ComparisonItem = ({ trace }) => {
+    // 'trace' prop comes from ComparisonPage, which is historical data processed by historySlice
+    if (!trace) return null;
 
     return (
         // Use Paper for consistent styling with other sections
@@ -1307,15 +1307,9 @@ const ComparisonItem = ({ trace: route }) => {
                 flexDirection: 'column'
             }}
         >
-            {/* Optional Header: Display basic info, kept minimal */}
-            {/* <Box sx={{ mb: 1, pb: 1, borderBottom: 1, borderColor: 'divider' }}>
-                <Typography variant="caption" color="text.secondary">
-                    Trace ID: {route.id} | {route.user?.username || 'N/A'} | {formatTimestamp(route.timestamp, 'short')}
-                </Typography>
-            </Box> */}
-
             {/* The main visualizer for the historical route */}
-            <HistoryRouteVisualizer route={route} />
+            {/* Pass the full trace object to the universal visualizer */}
+            <HistoryTraceVisualizer route={trace} />
         </Paper>
     );
 };
@@ -1326,15 +1320,26 @@ export default ComparisonItem;
 
 // ----- File: src\components\Comparison\ComparisonSelector.jsx -----
 
-// ----- File: src\components\Comparison\ComparisonSelector.jsx -----
 import React from 'react';
-import { Autocomplete, TextField, Checkbox, Box, Typography, Chip, Stack, Paper } from '@mui/material';
+import { Autocomplete, TextField, Checkbox, Box, Typography, Chip, Stack, Paper, Tooltip } from '@mui/material';
 import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
+import RouteIcon from '@mui/icons-material/Route'; // Combined Trace
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // MAC Trace
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck'; // Direct Route Trace
 import { formatTimestamp } from '../../utils/formatters';
 
 const icon = <CheckBoxOutlineBlankIcon fontSize="small" />;
 const checkedIcon = <CheckBoxIcon fontSize="small" />;
+
+const getTraceTypeIcon = (type) => {
+    switch (type) {
+        case 'combined': return <Tooltip title="Combined Trace"><RouteIcon fontSize="inherit" color="primary" /></Tooltip>;
+        case 'direct': return <Tooltip title="Direct Trace"><NetworkCheckIcon fontSize="inherit" color="secondary" /></Tooltip>;
+        case 'mac': return <Tooltip title="MAC Trace"><SettingsEthernetIcon fontSize="inherit" color="success" /></Tooltip>;
+        default: return null;
+    }
+};
 
 const ComparisonSelector = ({ availableRoutes, selectedIds, onChange }) => {
 
@@ -1352,9 +1357,9 @@ const ComparisonSelector = ({ availableRoutes, selectedIds, onChange }) => {
     });
 
     const getOptionLabel = (option) => {
-        // Label primarily used for filtering/searching, keep it concise
+        // Label primarily used for filtering/searching, keep it concise and include type
         const user = option.user ? `${option.user.username}` : 'N/A';
-        return `${option.source || 'N/A'} -> ${option.destination || 'N/A'} (${user}, ${option.id})`;
+        return `[${option.trace_type?.toUpperCase()}] ${option.source || '?'} -> ${option.destination || '?'} (${user}, ID: ${option.id})`;
     };
 
     const handleChange = (event, newValue) => {
@@ -1390,11 +1395,16 @@ const ComparisonSelector = ({ availableRoutes, selectedIds, onChange }) => {
                         {/* Use Stack for better layout of option details */}
                         <Stack spacing={0.5} sx={{ flexGrow: 1 }}>
                              {/* Main route identifier with Chips */}
-                             <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-                                <Chip label="Src" size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                             <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.8, flexWrap: 'wrap' }}>
+                                {/* Indicate Trace Type */}
+                                {getTraceTypeIcon(option.trace_type)}
+                                {/* Source */}
+                                <Chip label={option.trace_type === 'direct' ? "Src GW" : (option.trace_type === 'mac' ? "Endpoint" : "Src IP")} size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
                                 <Typography component="span" sx={{ fontWeight: 500, wordBreak: 'break-all' }}>{option.source || '?'}</Typography>
-                                <Typography component="span" sx={{ mx: 0.5 }}>→</Typography>
-                                <Chip label="Dst" size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                                {/* Arrow / Separator */}
+                                <Typography component="span" sx={{ mx: 0.5 }}>{option.trace_type === 'mac' ? '↔' : '→'}</Typography>
+                                 {/* Destination */}
+                                <Chip label={option.trace_type === 'direct' ? "Dst GW" : (option.trace_type === 'mac' ? "Gateway" : "Dst IP")} size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
                                 <Typography component="span" sx={{ fontWeight: 500, wordBreak: 'break-all' }}>{option.destination || '?'}</Typography>
                              </Typography>
                              {/* Secondary details: Timestamp, User, ID */}
@@ -1410,7 +1420,7 @@ const ComparisonSelector = ({ availableRoutes, selectedIds, onChange }) => {
                     <TextField
                         {...params}
                         variant="outlined"
-                        label="Search or Select Traces"
+                        label="Search or Select Traces (Combined, Direct, MAC)"
                         placeholder={selectedRoutes.length > 0 ? `${selectedRoutes.length} selected` : "Select from history..."}
                         InputLabelProps={{ shrink: true }} // Keep label shrunk
                     />
@@ -1430,30 +1440,107 @@ export default ComparisonSelector;
 
 // ----- End File: src\components\Comparison\ComparisonSelector.jsx -----
 
-// ----- File: src\components\Comparison\HistoryRouteVisualizer.jsx -----
+// ----- File: src\components\Comparison\HistoryTraceVisualizer.jsx -----
 
-// ----- File: src\components\Comparison\HistoryRouteVisualizer.jsx -----
 import React from 'react';
 import { Box, Typography, Stack, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Divider } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import InfoIcon from '@mui/icons-material/Info'; // Keep info icon for consistency
-import DeviceUnknownIcon from '@mui/icons-material/DeviceUnknown'; // Keep icon for device info
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import InfoIcon from '@mui/icons-material/Info';
+import CodeIcon from '@mui/icons-material/Code'; // For input details
+import AccountTreeIcon from '@mui/icons-material/AccountTree'; // Main Route
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // MAC Route
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows'; // For MAC trace display
 import HopDisplay from '../RouteTrace/HopDisplay'; // Reuse the hop display component
 import { formatTimestamp } from '../../utils/formatters';
 
-const HistoryRouteVisualizer = ({ route }) => {
-    if (!route) return <Typography color="error">Invalid route data provided.</Typography>;
-
-    const { id, source, destination, timestamp, routeData, deviceInfo, user } = route;
-
-    // Validate data (assuming routeData is parsed array from historySlice)
-    const hasValidRouteData = Array.isArray(routeData) && routeData.length > 0;
-    const hasDeviceInfo = deviceInfo && typeof deviceInfo === 'object' && Object.keys(deviceInfo).length > 0;
+// Helper to render a hop section (reusable for main, source mac, dest mac)
+// NOW includes horizontal scrolling wrapper - Adjusted Structure
+const renderHopSection = (hops, title, icon, defaultExpanded = false) => {
+    // Assumes hops is a non-empty array
 
     return (
-        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}> {/* Allow vertical growth */}
-            {/* Header Info - More compact and aligned */}
+        <Accordion
+            defaultExpanded={defaultExpanded}
+            elevation={0} variant="outlined"
+            sx={{ mb: 1 }}
+            slotProps={{ transition: { unmountOnExit: true } }}
+         >
+             <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
+                aria-controls={`panel-${title.replace(/\s+/g, '-')}-content`}
+                id={`panel-${title.replace(/\s+/g, '-')}-header`}
+                sx={{ minHeight: '40px', '&.Mui-expanded': { minHeight: '40px' }, '& .MuiAccordionSummary-content': { my: 0.5, alignItems: 'center' } }}
+             >
+                 {icon && React.cloneElement(icon, { sx: { mr: 1, color: 'action.active', fontSize: '1.2rem' } })}
+                 <Typography variant="caption" fontWeight="medium">{title} ({hops.length} hops)</Typography>
+             </AccordionSummary>
+             {/* AccordionDetails now acts as the scrolling container */}
+             <AccordionDetails sx={{
+                bgcolor: 'action.hover',
+                p: 1.5, // Add padding here
+                py: 2, // More vertical padding
+                borderTop: 1,
+                borderColor: 'divider',
+                overflowX: 'auto', // Enable horizontal scroll on the details area itself
+                '&::-webkit-scrollbar': { // Basic scrollbar styling (optional)
+                    height: '8px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                    backgroundColor: (theme) => theme.palette.action.disabled,
+                    borderRadius: '4px',
+                },
+             }}>
+                 {/* Stack directly inside the scrollable details */}
+                 <Stack
+                     direction="row"
+                     spacing={0} // Spacing handled by HopDisplay arrows
+                     alignItems="center" // Align hops vertically
+                     sx={{
+                         minWidth: 'max-content', // Crucial: Force Stack wider than container
+                         minHeight: 80,
+                         // Removed py here, handled by AccordionDetails padding
+                     }}
+                 >
+                     {hops.map((hop, index) => (
+                         <HopDisplay
+                             key={`${hop.device_id || hop.ip || hop.mac || `hop-${hop.hop}`}-${index}`} // More robust key
+                             hopData={hop}
+                             isFirst={index === 0}
+                             isLast={index === hops.length - 1}
+                         />
+                     ))}
+                 </Stack>
+             </AccordionDetails>
+         </Accordion>
+    );
+};
+
+
+const HistoryTraceVisualizer = ({ route }) => {
+    if (!route) return <Typography color="error">Invalid route data provided.</Typography>;
+
+    const {
+        id, source, destination, timestamp, user, trace_type,
+        mainRouteTrace, sourceMacTrace, destinationMacTrace, inputDetails
+    } = route;
+
+    // Determine primary identifiers based on trace type for header display
+    const primarySourceLabel = trace_type === 'direct' ? "Src GW" : (trace_type === 'mac' ? "Endpoint" : "Src IP");
+    const primaryDestLabel = trace_type === 'direct' ? "Dst GW" : (trace_type === 'mac' ? "Gateway" : "Dst IP");
+    const separator = trace_type === 'mac' ? '↔' : '→';
+
+
+    // Check if data exists for different sections
+    const hasMainRoute = mainRouteTrace && mainRouteTrace.length > 0;
+    const hasSourceMac = sourceMacTrace && sourceMacTrace.length > 0;
+    const hasDestMac = destinationMacTrace && destinationMacTrace.length > 0;
+    const hasInputs = inputDetails && typeof inputDetails === 'object' && Object.keys(inputDetails).length > 0;
+    const vrf = inputDetails?.vrf; // Extract VRF if present in inputs
+
+    return (
+        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+            {/* Header Info */}
             <Paper elevation={0} variant="outlined" sx={{ p: 1.5, mb: 2 }}>
                  <Stack
                     direction={{ xs: 'column', sm: 'row' }}
@@ -1463,14 +1550,19 @@ const HistoryRouteVisualizer = ({ route }) => {
                     flexWrap="wrap"
                  >
                     {/* Source/Destination */}
-                    <Box sx={{ minWidth: 0 }}> {/* Prevent text overflow issues */}
+                    <Box sx={{ minWidth: 0 }}>
                         <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
-                             <Chip label="Src" size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                             <Chip label={primarySourceLabel} size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
                              <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{source || 'N/A'}</Typography>
-                             <Typography component="span" sx={{ mx: 1 }}>→</Typography>
-                             <Chip label="Dst" size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                             <Typography component="span" sx={{ mx: 1 }}>{separator}</Typography>
+                             <Chip label={primaryDestLabel} size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
                              <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{destination || 'N/A'}</Typography>
                         </Typography>
+                        {/* Display Trace Type and VRF if applicable */}
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                            <Chip label={trace_type?.toUpperCase()} size="small" variant='filled' color="default" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 'medium' }} />
+                            {vrf && <Chip label={`VRF: ${vrf}`} size="small" variant='outlined' color="info" sx={{ height: 20, fontSize: '0.7rem' }} />}
+                        </Stack>
                     </Box>
                      {/* Timestamp/User/ID */}
                      <Stack direction="column" alignItems={{ xs: 'flex-start', sm: 'flex-end' }} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
@@ -1489,108 +1581,108 @@ const HistoryRouteVisualizer = ({ route }) => {
                 </Stack>
             </Paper>
 
-            {/* Device Info Accordion (Conditional) */}
-            {hasDeviceInfo && (
+            {/* Input Details Accordion (Conditional) */}
+            {hasInputs && (
                  <Accordion
-                    elevation={0} variant="outlined" // Subtle look
+                    elevation={0} variant="outlined"
                     sx={{ mb: 1 }}
-                    slotProps={{ transition: { unmountOnExit: true } }} // More performant transition
+                    slotProps={{ transition: { unmountOnExit: true } }}
                   >
                      <AccordionSummary
                         expandIcon={<ExpandMoreIcon />}
-                        aria-controls={`panel-deviceinfo-${id}-content`}
-                        id={`panel-deviceinfo-${id}-header`}
-                        sx={{ minHeight: '40px', '&.Mui-expanded': { minHeight: '40px' }, '& .MuiAccordionSummary-content': { my: 0.5 } }}
+                        aria-controls={`panel-inputs-${id}-content`}
+                        id={`panel-inputs-${id}-header`}
+                        sx={{ minHeight: '40px', '&.Mui-expanded': { minHeight: '40px' }, '& .MuiAccordionSummary-content': { my: 0.5, alignItems: 'center' } }}
                      >
-                         <DeviceUnknownIcon sx={{ mr: 1, color: 'action.active', fontSize: '1.2rem' }}/>
-                         <Typography variant="caption" fontWeight="medium">Additional Device Info</Typography>
+                         <CodeIcon sx={{ mr: 1, color: 'action.active', fontSize: '1.2rem' }}/>
+                         <Typography variant="caption" fontWeight="medium">Trace Input Parameters</Typography>
                      </AccordionSummary>
                      <AccordionDetails sx={{ bgcolor: 'action.hover', p: 1, borderTop: 1, borderColor: 'divider' }}>
-                         {/* Use pre for formatted JSON, ensure it's scrollable */}
                          <pre style={{
-                             fontSize: '0.75rem',
-                             margin: 0,
-                             padding: '8px',
-                             borderRadius: '4px',
-                             overflowX: 'auto',
-                             whiteSpace: 'pre-wrap',
-                             wordBreak: 'break-all',
-                             maxHeight: '200px', // Limit height
-                             backgroundColor: (theme) => theme.palette.background.default, // Match background
-                             }}>
-                             {JSON.stringify(deviceInfo, null, 2)}
+                             fontSize: '0.75rem', margin: 0, padding: '8px', borderRadius: '4px',
+                             overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                             maxHeight: '200px', backgroundColor: (theme) => theme.palette.background.default,
+                         }}>
+                             {JSON.stringify(inputDetails, null, 2)}
                          </pre>
                      </AccordionDetails>
                  </Accordion>
             )}
 
-            {/* Route Trace Accordion */}
-            <Accordion
-                defaultExpanded // Keep hops expanded by default
-                elevation={0} variant="outlined" // Consistent subtle look
-                slotProps={{ transition: { unmountOnExit: true } }}
-                sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }} // Allow accordion to fill space
-             >
-                 <AccordionSummary
-                    expandIcon={<ExpandMoreIcon />}
-                    aria-controls={`panel-routedata-${id}-content`}
-                    id={`panel-routedata-${id}-header`}
-                     sx={{ minHeight: '48px', '&.Mui-expanded': { minHeight: '48px' }, '& .MuiAccordionSummary-content': { my: 1 } }}
-                 >
-                     <AccountTreeIcon sx={{ mr: 1, color: 'action.active' }} />
-                     <Typography variant="subtitle2">Detailed Hops ({routeData?.length ?? 0})</Typography>
-                 </AccordionSummary>
-                 <AccordionDetails sx={{ p: 1, flexGrow: 1, overflow: 'hidden', display: 'flex' }}> {/* Let details grow and manage overflow */}
-                    {hasValidRouteData ? (
-                        <Box // Wrapper to handle overflow for the Stack
-                            sx={{
-                                overflowX: 'auto',
-                                width: '100%', // Take full width of details area
-                                py: 1,
-                                px: 0.5,
-                                // Optional border removed, Accordion border is sufficient
-                                // border: '1px dashed', borderColor: 'divider', borderRadius: 1,
-                            }}
-                        >
-                            <Stack
-                                direction="row"
-                                spacing={0} // Spacing handled by HopDisplay arrows
-                                alignItems="center" // Align hops vertically
-                                sx={{
-                                    minWidth: 'max-content', // Ensure stack takes at least content width
-                                    minHeight: 100, // Ensure minimum height
-                                    pb: 1, // Padding bottom for scrollbar space if needed
-                                }}
-                            >
-                                {routeData.map((hop, index) => (
-                                    <HopDisplay
-                                        key={`${hop.device_id || hop.ip || hop.mac || `hop-${hop.hop}`}-${index}`} // More robust key
-                                        hopData={hop}
-                                        isFirst={index === 0}
-                                        isLast={index === routeData.length - 1}
-                                    />
-                                ))}
-                            </Stack>
-                        </Box>
-                    ) : (
-                        <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic', alignSelf: 'center' }}>
-                            No detailed route hops available in this history entry.
-                        </Typography>
+            {/* --- Trace Specific Visualizations --- */}
+
+            {/* Combined Trace */}
+            {trace_type === 'combined' && (
+                <>
+                    {/* Source L2 Path - Render only if data exists */}
+                    {hasSourceMac && renderHopSection(sourceMacTrace, "Source MAC Path", <SettingsEthernetIcon />)}
+                    {/* Divider/Indicator - Render only if both sections above/below exist */}
+                    {hasSourceMac && hasMainRoute && (
+                        <Box textAlign="center" sx={{ my: -0.5 }}><ArrowDownwardIcon fontSize="small" color="action" sx={{ opacity: 0.5 }} /></Box>
                     )}
-                </AccordionDetails>
-            </Accordion>
+                    {/* Main IP Path - Render only if data exists */}
+                    {hasMainRoute && renderHopSection(mainRouteTrace, "Main Route Path (IP Hops)", <AccountTreeIcon />, true)}
+                     {/* Divider/Indicator - Render only if both sections above/below exist */}
+                    {hasMainRoute && hasDestMac && (
+                        <Box textAlign="center" sx={{ my: -0.5 }}><ArrowDownwardIcon fontSize="small" color="action" sx={{ opacity: 0.5 }} /></Box>
+                    )}
+                    {/* Destination L2 Path - Render only if data exists */}
+                    {hasDestMac && renderHopSection(destinationMacTrace, "Destination MAC Path", <SettingsEthernetIcon />)}
+                    {/* Show message if no parts have data */}
+                    {!hasSourceMac && !hasMainRoute && !hasDestMac && (
+                         <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
+                            No detailed hop data available for this combined trace entry.
+                         </Typography>
+                    )}
+                </>
+            )}
+
+            {/* Direct Trace */}
+            {trace_type === 'direct' && (
+                 <>
+                    {/* Only show Main Route Path - Render only if data exists */}
+                    {hasMainRoute ? (
+                        renderHopSection(mainRouteTrace, "Direct Route Path", <AccountTreeIcon />, true)
+                    ) : (
+                         <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
+                             No detailed hop data available for this direct trace entry.
+                         </Typography>
+                    )}
+                 </>
+            )}
+
+            {/* MAC Trace */}
+            {trace_type === 'mac' && (
+                <>
+                    {/* Only show Source MAC Path (renamed for clarity) - Render only if data exists */}
+                    {hasSourceMac ? (
+                        renderHopSection(sourceMacTrace, "MAC Trace Path", <SettingsEthernetIcon />, true)
+                    ) : (
+                         <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
+                             No detailed hop data available for this MAC trace entry.
+                         </Typography>
+                    )}
+                </>
+            )}
+
+            {/* Fallback if trace type is unknown */}
+            {trace_type !== 'combined' && trace_type !== 'direct' && trace_type !== 'mac' && (
+                <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic', alignSelf: 'center' }}>
+                    No detailed visualization available for this trace type ({trace_type || 'Unknown'}).
+                </Typography>
+            )}
+
 
         </Box>
     );
 };
 
-export default HistoryRouteVisualizer;
+export default HistoryTraceVisualizer;
 
-// ----- End File: src\components\Comparison\HistoryRouteVisualizer.jsx -----
-
-// ----- File: src\components\History\HistoryItem.jsx -----
+// ----- End File: src\components\Comparison\HistoryTraceVisualizer.jsx -----
 
 // ----- File: src\components\History\HistoryItem.jsx -----
+
 import React, { useState } from 'react';
 import {
     ListItem,
@@ -1602,44 +1694,56 @@ import {
     Paper,
     Stack,
     Chip,
-    Accordion,
-    AccordionSummary,
-    AccordionDetails,
-    Divider,
+    Tooltip, // Added Tooltip
     useTheme, // Import useTheme hook
 } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
-import ExpandMore from '@mui/icons-material/ExpandMore'; // <-- Correct import name is ExpandMore
-import DeviceUnknownIcon from '@mui/icons-material/DeviceUnknown';
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import CodeIcon from '@mui/icons-material/Code'; // Icon for Raw Data
-import HopDisplay from '../RouteTrace/HopDisplay';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+// Icons for trace types
+import RouteIcon from '@mui/icons-material/Route'; // Combined Trace
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // MAC Trace
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck'; // Direct Route Trace
+// Use the universal visualizer for details
+import HistoryTraceVisualizer from '../Comparison/HistoryTraceVisualizer'; // Adjusted path if needed
 import { formatTimestamp } from '../../utils/formatters';
+
+const getTraceTypeIcon = (type) => {
+    switch (type) {
+        case 'combined': return <Tooltip title="Combined Trace"><RouteIcon fontSize="inherit" color="primary" /></Tooltip>;
+        case 'direct': return <Tooltip title="Direct Trace"><NetworkCheckIcon fontSize="inherit" color="secondary" /></Tooltip>;
+        case 'mac': return <Tooltip title="MAC Trace"><SettingsEthernetIcon fontSize="inherit" color="success" /></Tooltip>;
+        default: return null;
+    }
+};
 
 const HistoryItem = ({ route }) => {
   const [open, setOpen] = useState(false);
   const theme = useTheme(); // Access theme for colors/spacing
-  const { id, source, destination, timestamp, routeData, deviceInfo, user } = route;
+  const {
+      id, source, destination, timestamp, user, trace_type,
+      mainRouteTrace, sourceMacTrace, destinationMacTrace, inputDetails
+    } = route; // Use processed data
 
   const handleClick = () => {
     setOpen(!open);
   };
 
-  // Check if routeData is valid (should be parsed array)
-  const hasValidRouteData = Array.isArray(routeData) && routeData.length > 0;
-  // Check if there's raw route data to display (string format and not successfully parsed/empty)
-  const hasRawRouteString = typeof route.route === 'string' && route.route.trim() !== '' && !hasValidRouteData;
-  const hasDeviceInfo = deviceInfo && typeof deviceInfo === 'object' && Object.keys(deviceInfo).length > 0;
+  // Check if there are details to expand
+  const hasDetails = (mainRouteTrace && mainRouteTrace.length > 0) ||
+                     (sourceMacTrace && sourceMacTrace.length > 0) ||
+                     (destinationMacTrace && destinationMacTrace.length > 0) ||
+                     (inputDetails && Object.keys(inputDetails).length > 0);
 
-  // Determine if there's any expandable content
-  const hasDetails = hasValidRouteData || hasDeviceInfo || hasRawRouteString;
+  // Determine primary identifiers based on trace type for header display
+  const primarySourceLabel = trace_type === 'direct' ? "Src GW" : (trace_type === 'mac' ? "Endpoint" : "Src IP");
+  const primaryDestLabel = trace_type === 'direct' ? "Dst GW" : (trace_type === 'mac' ? "Gateway" : "Dst IP");
+  const separator = trace_type === 'mac' ? '↔' : '→';
 
   return (
     <>
       {/* Main List Item Header */}
       <ListItem
-         // Use button prop only if there are details to expand
-         button={hasDetails}
+         button={hasDetails} // Use button prop only if there are details to expand
          onClick={hasDetails ? handleClick : undefined} // Only allow click if expandable
          divider
          aria-expanded={open}
@@ -1659,14 +1763,26 @@ const HistoryItem = ({ route }) => {
                 spacing={{ xs: 0.5, sm: 2 }}
                 sx={{ width: '100%', mb: 0.5 }} // Ensure stack takes full width
               >
-                  {/* Source -> Destination */}
-                  <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5, minWidth: 0, flexGrow: 1 }}>
-                      <Chip label="Src" size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
-                      <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{source || 'N/A'}</Typography>
-                      <Typography component="span" sx={{ mx: 1 }}>→</Typography>
-                      <Chip label="Dst" size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
-                      <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{destination || 'N/A'}</Typography>
-                  </Typography>
+                  {/* Source -> Destination & Type */}
+                  <Stack spacing={0.5} sx={{ minWidth: 0, flexGrow: 1 }}>
+                       <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
+                           {/* Trace Type Icon */}
+                            {getTraceTypeIcon(trace_type)}
+                            {/* Source */}
+                            <Chip label={primarySourceLabel} size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                            <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{source || 'N/A'}</Typography>
+                             {/* Arrow / Separator */}
+                            <Typography component="span" sx={{ mx: 1 }}>{separator}</Typography>
+                             {/* Destination */}
+                            <Chip label={primaryDestLabel} size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                            <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{destination || 'N/A'}</Typography>
+                       </Typography>
+                       {/* Optional: Display VRF from inputDetails if present */}
+                       {inputDetails?.vrf && (
+                           <Chip label={`VRF: ${inputDetails.vrf}`} size="small" variant='outlined' color="info" sx={{ height: 20, fontSize: '0.7rem', alignSelf: 'flex-start' }} />
+                       )}
+                  </Stack>
+
                   {/* User/Timestamp/ID */}
                   <Stack direction="column" alignItems={{ xs: 'flex-start', sm: 'flex-end' }} sx={{ minWidth: '160px', textAlign: {xs: 'left', sm: 'right'} }}>
                      {user && <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>User: {user.username}</Typography>}
@@ -1675,8 +1791,6 @@ const HistoryItem = ({ route }) => {
                   </Stack>
              </Stack>
             }
-            // Optional: Secondary text for brief summary if needed
-            // secondary={ ... }
         />
         {/* Show expand icon only if details exist */}
         {hasDetails && (
@@ -1688,88 +1802,9 @@ const HistoryItem = ({ route }) => {
 
       {/* Collapsible Details Section */}
       <Collapse in={open} timeout="auto" unmountOnExit id={`history-item-details-${id}`}>
-        {/* Use Box with padding instead of Paper for less visual weight */}
-        <Box sx={{ px: 2, py: 1, bgcolor: 'action.hover' }}>
-            {/* Device Info Accordion (Conditional) */}
-            {hasDeviceInfo && (
-                 <Accordion elevation={0} variant="outlined" sx={{ mb: 1 }} slotProps={{ transition: { unmountOnExit: true } }}>
-                     <AccordionSummary
-                        expandIcon={<ExpandMore />} 
-                        aria-controls={`panel-deviceinfo-${id}-content`}
-                        id={`panel-deviceinfo-${id}-header`}
-                        sx={{ minHeight: '40px', '&.Mui-expanded': { minHeight: '40px' }, '& .MuiAccordionSummary-content': { my: 0.5 } }}
-                     >
-                         <DeviceUnknownIcon sx={{ mr: 1, color: 'action.active', fontSize: '1.2rem' }}/>
-                         <Typography variant="caption" fontWeight="medium">Additional Device Info</Typography>
-                     </AccordionSummary>
-                     <AccordionDetails sx={{ bgcolor: 'background.default', p: 1, borderTop: 1, borderColor: 'divider' }}>
-                         <pre style={{ fontSize: '0.75rem', margin: 0, padding: '8px', borderRadius: '4px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: '200px' }}>
-                             {JSON.stringify(deviceInfo, null, 2)}
-                         </pre>
-                     </AccordionDetails>
-                 </Accordion>
-            )}
-
-            {/* Route Trace Accordion (Conditional) */}
-            {hasValidRouteData && (
-                <Accordion defaultExpanded elevation={0} variant="outlined" sx={{ mb: hasRawRouteString ? 1 : 0 }} slotProps={{ transition: { unmountOnExit: true } }}>
-                     <AccordionSummary
-                        expandIcon={<ExpandMore />} 
-                        aria-controls={`panel-routedata-${id}-content`}
-                        id={`panel-routedata-${id}-header`}
-                        sx={{ minHeight: '48px', '&.Mui-expanded': { minHeight: '48px' }, '& .MuiAccordionSummary-content': { my: 1 } }}
-                     >
-                         <AccountTreeIcon sx={{ mr: 1, color: 'action.active' }} />
-                         <Typography variant="subtitle2">Detailed Route Hops ({routeData.length})</Typography>
-                     </AccordionSummary>
-                     <AccordionDetails sx={{ p: 1, overflow: 'hidden', display: 'flex' }}>
-                         <Box sx={{ overflowX: 'auto', width: '100%', py: 1, px: 0.5 }}>
-                             <Stack
-                                 direction="row"
-                                 spacing={0}
-                                 alignItems="center"
-                                 sx={{ minWidth: 'max-content', minHeight: 100, pb: 1 }}
-                             >
-                                 {routeData.map((hop, index) => (
-                                     <HopDisplay
-                                         key={`${hop.device_id || hop.ip || hop.mac || `hop-${hop.hop}`}-${index}`} // More robust key
-                                         hopData={hop}
-                                         isFirst={index === 0}
-                                         isLast={index === routeData.length - 1}
-                                     />
-                                 ))}
-                             </Stack>
-                         </Box>
-                    </AccordionDetails>
-                </Accordion>
-            )}
-
-            {/* Raw Route Data Accordion (Conditional) */}
-             {hasRawRouteString && (
-                  <Accordion elevation={0} variant="outlined" slotProps={{ transition: { unmountOnExit: true } }}>
-                    <AccordionSummary
-                        expandIcon={<ExpandMore />} 
-                        aria-controls={`panel-raw-${id}-content`}
-                        id={`panel-raw-${id}-header`}
-                        sx={{ minHeight: '40px', '&.Mui-expanded': { minHeight: '40px' }, '& .MuiAccordionSummary-content': { my: 0.5 } }}
-                    >
-                         <CodeIcon sx={{ mr: 1, color: 'action.active', fontSize: '1.2rem' }}/>
-                        <Typography variant="caption" fontWeight="medium">Raw Route Data (Parsing Failed or Empty)</Typography>
-                    </AccordionSummary>
-                    <AccordionDetails sx={{ bgcolor: 'background.default', p: 1, borderTop: 1, borderColor: 'divider' }}>
-                        <pre style={{ fontSize: '0.75rem', margin: 0, padding: '8px', borderRadius: '4px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: '200px' }}>
-                            {route.route} {/* Display the raw string */}
-                        </pre>
-                    </AccordionDetails>
-                  </Accordion>
-             )}
-
-            {/* Message if no details at all */}
-            {!hasDetails && ( // Should not happen if button logic is correct, but as fallback
-                 <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
-                    No details available for this entry.
-                 </Typography>
-            )}
+        <Box sx={{ px: {xs: 1, sm: 2}, py: 1.5, bgcolor: 'action.hover', borderBottom: 1, borderColor: 'divider' }}>
+            {/* Render the universal visualizer with the full route object */}
+            <HistoryTraceVisualizer route={route} />
         </Box>
       </Collapse>
     </>
@@ -1777,7 +1812,6 @@ const HistoryItem = ({ route }) => {
 };
 
 export default HistoryItem;
-// ----- End File: src\components\History\HistoryItem.jsx -----
 
 // ----- End File: src\components\History\HistoryItem.jsx -----
 
@@ -3551,20 +3585,20 @@ export default AllRoutesPage;
 
 // ----- File: src\pages\ComparisonPage.jsx -----
 
-// ----- File: src\pages\ComparisonPage.jsx -----
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Box, Typography, Alert, Paper } from '@mui/material';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import ComparisonSelector from '../components/Comparison/ComparisonSelector';
 import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
-import ComparisonItem from '../components/Comparison/ComparisonItem';
+import ComparisonItem from '../components/Comparison/ComparisonItem'; // ComparisonItem now uses universal visualizer
 import LoadingSpinner from '../components/Common/LoadingSpinner';
 import ErrorMessage from '../components/Common/ErrorMessage';
 import { fetchAllHistory, resetHistoryError } from '../store/slices/historySlice';
 
 const ComparisonPage = () => {
     const dispatch = useDispatch();
+    // Use allHistory which contains processed entries of all types
     const { allHistory, allHistoryStatus, error: historyError } = useSelector((state) => state.history);
     // Store IDs of the routes selected for comparison
     const [selectedRouteIds, setSelectedRouteIds] = useState([]);
@@ -3575,9 +3609,7 @@ const ComparisonPage = () => {
             dispatch(fetchAllHistory());
         }
         // Optional: Reset error on unmount
-        return () => {
-            // dispatch(resetHistoryError());
-        };
+        // return () => { dispatch(resetHistoryError()); };
     }, [allHistoryStatus, dispatch]);
 
     // Handler for when the selection in ComparisonSelector changes
@@ -3610,7 +3642,7 @@ const ComparisonPage = () => {
                 <>
                     {/* Component to select routes from the available history */}
                     <ComparisonSelector
-                        availableRoutes={allHistory}
+                        availableRoutes={allHistory} // Pass all history entries
                         selectedIds={selectedRouteIds}
                         onChange={handleSelectionChange}
                     />
@@ -3621,7 +3653,7 @@ const ComparisonPage = () => {
                              {/* Container responsible for laying out the comparison items */}
                              <RouteComparisonContainer
                                 traces={selectedRoutesData} // Pass the filtered historical data
-                                SectionComponent={ComparisonItem} // Specify the component to render each trace
+                                SectionComponent={ComparisonItem} // ComparisonItem renders HistoryTraceVisualizer internally
                              />
                          </Box>
                     ) : (
@@ -3632,7 +3664,7 @@ const ComparisonPage = () => {
                             variant="outlined" // Use outlined for less emphasis
                             sx={{ mt: 3 }}
                          >
-                            Select two or more routes from the list above to compare them side-by-side.
+                            Select two or more routes (Combined, Direct, or MAC) from the list above to compare them side-by-side.
                          </Alert>
                     )}
                 </>
@@ -3647,30 +3679,21 @@ export default ComparisonPage;
 
 // ----- File: src\pages\DirectRouteTracePage.jsx -----
 
-// ----- File: src\pages\DirectRouteTracePage.jsx -----
-// ----- File: src\pages\DirectRouteTracePage.jsx -----
 import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { Button, Box, Typography, Tooltip } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
+import { useSelector } from 'react-redux'; // Removed useDispatch
+import { Box, Typography } from '@mui/material'; // Removed Button, Tooltip, AddIcon
 import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
 import DirectRouteTraceSection from '../components/RouteTrace/DirectRouteTraceSection';
-import { addDirectTraceSection } from '../store/slices/directRouteSlice';
+// Removed addDirectTraceSection import
 
-const MAX_COMPARISON_SECTIONS = 4; // Define a max limit for comparison sections
+// Removed MAX_COMPARISON_SECTIONS constant
 
 const DirectRouteTracePage = () => {
-    const dispatch = useDispatch();
+    // Removed dispatch
     // Select the array of trace states from the directRoute slice
     const traces = useSelector((state) => state.directRoute.traces);
 
-    const canAddMore = traces.length < MAX_COMPARISON_SECTIONS;
-
-    const handleAddRoute = () => {
-        if (canAddMore) {
-            dispatch(addDirectTraceSection());
-        }
-    }
+    // Removed canAddMore and handleAddRoute
 
   return (
     <Box>
@@ -3678,39 +3701,23 @@ const DirectRouteTracePage = () => {
         Trace Direct Network Route
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Perform a direct route trace between two specified IP addresses using their respective default gateways. Add multiple sections to compare different traces side-by-side.
+        Perform a direct route trace between two specified IP addresses using their respective default gateways.
       </Typography>
 
       {/* Container to display one or more trace sections side-by-side */}
+      {/* Pass canRemove={false} explicitly if you never want removal, */}
+      {/* or adjust based on whether the slice supports removal (currently doesn't cleanly) */}
       <RouteComparisonContainer
             traces={traces}
             SectionComponent={DirectRouteTraceSection} // Pass the specific section component
         />
 
-       {/* Button to add another trace section for comparison */}
-       <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
-            <Tooltip title={!canAddMore ? `Maximum ${MAX_COMPARISON_SECTIONS} comparison sections reached` : "Add another trace input section"}>
-                {/* Span needed for tooltip when button is disabled */}
-                <span>
-                    <Button
-                        variant="outlined"
-                        startIcon={<AddIcon />}
-                        onClick={handleAddRoute}
-                        disabled={!canAddMore}
-                        aria-label="Add trace section for comparison"
-                    >
-                        Add Trace for Comparison
-                    </Button>
-                </span>
-            </Tooltip>
-       </Box>
+       {/* Removed the "Add Trace for Comparison" button and surrounding Box */}
     </Box>
   );
 };
 
 export default DirectRouteTracePage;
-
-// ----- End File: src\pages\DirectRouteTracePage.jsx -----
 
 // ----- End File: src\pages\DirectRouteTracePage.jsx -----
 
@@ -3793,29 +3800,21 @@ export default LoginPage;
 
 // ----- File: src\pages\MacTracePage.jsx -----
 
-// ----- File: src\pages\MacTracePage.jsx -----
 import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { Button, Box, Typography, Tooltip } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
+import { useSelector } from 'react-redux'; // Removed useDispatch
+import { Box, Typography } from '@mui/material'; // Removed Button, Tooltip, AddIcon
 import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
 import MacTraceSection from '../components/RouteTrace/MacTraceSection';
-import { addMacTraceSection } from '../store/slices/macTraceSlice';
+// Removed addMacTraceSection import
 
-const MAX_COMPARISON_SECTIONS = 4; // Define a max limit
+// Removed MAX_COMPARISON_SECTIONS constant
 
 const MacTracePage = () => {
-    const dispatch = useDispatch();
+    // Removed dispatch
     // Select the array of trace states from the macTrace slice
     const traces = useSelector((state) => state.macTrace.traces);
 
-    const canAddMore = traces.length < MAX_COMPARISON_SECTIONS;
-
-    const handleAddRoute = () => {
-       if (canAddMore) {
-           dispatch(addMacTraceSection());
-       }
-    }
+    // Removed canAddMore and handleAddRoute
 
   return (
     <Box>
@@ -3823,31 +3822,18 @@ const MacTracePage = () => {
         Trace MAC Path (Endpoint ↔ Gateway)
       </Typography>
        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Perform a Layer 2 MAC address trace between an endpoint IP and its default gateway. Add multiple sections to compare different MAC traces.
+        Perform a Layer 2 MAC address trace between an endpoint IP and its default gateway.
       </Typography>
 
       {/* Container to display one or more trace sections side-by-side */}
+       {/* Pass canRemove={false} explicitly if you never want removal, */}
+       {/* or adjust based on whether the slice supports removal */}
       <RouteComparisonContainer
             traces={traces}
             SectionComponent={MacTraceSection} // Pass the specific section component
       />
 
-       {/* Button to add another trace section for comparison */}
-       <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
-           <Tooltip title={!canAddMore ? `Maximum ${MAX_COMPARISON_SECTIONS} comparison sections reached` : "Add another MAC trace input section"}>
-                <span> {/* Span for tooltip on disabled button */}
-                    <Button
-                        variant="outlined"
-                        startIcon={<AddIcon />}
-                        onClick={handleAddRoute}
-                        disabled={!canAddMore}
-                        aria-label="Add MAC trace section for comparison"
-                    >
-                        Add Trace for Comparison
-                    </Button>
-                </span>
-            </Tooltip>
-       </Box>
+       {/* Removed the "Add Trace for Comparison" button and surrounding Box */}
     </Box>
   );
 };
@@ -4398,7 +4384,6 @@ export default directRouteSlice.reducer;
 
 // ----- File: src\store\slices\historySlice.js -----
 
-// ----- File: src\store\slices\historySlice.js -----
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import routeService from '../../services/routeService';
 
@@ -4406,37 +4391,48 @@ import routeService from '../../services/routeService';
 const safeParseJson = (jsonString, defaultValue = null) => {
   // If it's already an object (e.g., already parsed), return it directly
   if (typeof jsonString === 'object' && jsonString !== null) return jsonString;
-  // If it's not a string, return the default value
+  // If it's not a string or empty/whitespace, return the default value
   if (typeof jsonString !== 'string' || jsonString.trim() === '') return defaultValue;
 
   try {
-    const parsed = JSON.parse(jsonString);
-    // Basic check if parsed result is an array (for routeData)
-    // Adjust check if other structures are expected
-    if (Array.isArray(parsed)) {
-        return parsed;
-    } else if (typeof parsed === 'object' && parsed !== null) { // For deviceInfo
-         return parsed;
-    }
-    // If parsed into something unexpected (e.g., a primitive), return default
-    return defaultValue;
+    // Don't check type after parsing, just return the parsed result
+    return JSON.parse(jsonString);
   } catch (e) {
     // Log parsing errors for debugging, but don't crash the app
-    console.warn("Failed to parse JSON string:", jsonString, "Error:", e);
+    console.warn("Failed to parse JSON string:", jsonString?.substring(0, 100) + "...", "Error:", e); // Log only start of long strings
     return defaultValue; // Return default value on parsing failure
   }
 };
 
 // Helper to process raw route entries from the backend
-const processRouteEntry = (route) => ({
-    ...route,
-    // Parse the 'route' field (expected List[DetailedHop] as JSON string)
-    routeData: safeParseJson(route.route, []), // Default to empty array if parsing fails or invalid
-    // Parse the 'device_additional_info' field (expected JSON object string or null)
-    deviceInfo: safeParseJson(route.device_additional_info, null), // Default to null
-    // Ensure user is an object or null
-    user: (typeof route.user === 'object' && route.user !== null) ? route.user : null
-});
+const processRouteEntry = (route) => {
+    // Ensure default values are appropriate (e.g., [] for hop lists, null for objects)
+    const mainRouteTrace = safeParseJson(route.main_route_trace, []);
+    const sourceMacTrace = safeParseJson(route.source_mac_trace, []);
+    const destinationMacTrace = safeParseJson(route.destination_mac_trace, []);
+    const inputDetails = safeParseJson(route.input_details, null);
+
+    // Basic validation: ensure parsed hop traces are arrays
+    const validMainRoute = Array.isArray(mainRouteTrace) ? mainRouteTrace : [];
+    const validSourceMac = Array.isArray(sourceMacTrace) ? sourceMacTrace : [];
+    const validDestMac = Array.isArray(destinationMacTrace) ? destinationMacTrace : [];
+
+    return {
+        ...route, // Include id, source, destination, trace_type, timestamp, user
+        mainRouteTrace: validMainRoute,
+        sourceMacTrace: validSourceMac,
+        destinationMacTrace: validDestMac,
+        inputDetails: (typeof inputDetails === 'object') ? inputDetails : null, // Ensure inputDetails is object or null
+        // Keep original user object structure
+        user: (typeof route.user === 'object' && route.user !== null) ? route.user : null,
+        // Deprecated fields removed/replaced
+        route: undefined, // Remove old 'route' field
+        routeData: undefined, // Remove old 'routeData' field
+        deviceInfo: undefined, // Remove old 'deviceInfo' field
+        device_additional_info: undefined // Remove original backend field name
+    };
+};
+
 
 // Async thunk for fetching user-specific route history
 export const fetchUserHistory = createAsyncThunk(
