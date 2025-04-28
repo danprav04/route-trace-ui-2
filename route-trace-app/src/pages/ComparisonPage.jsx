@@ -1,7 +1,11 @@
+// ----- File: src\pages\ComparisonPage.jsx -----
+
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Box, Typography, Alert, Paper } from '@mui/material';
+import { Box, Typography, Alert, Paper, Stack, ToggleButton, Tooltip } from '@mui/material'; // Added Stack, ToggleButton, Tooltip
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import ViewCompactIcon from '@mui/icons-material/ViewCompact'; // Icon for minimal view
+import ViewHeadlineIcon from '@mui/icons-material/ViewHeadline'; // Icon for detailed view
 import ComparisonSelector from '../components/Comparison/ComparisonSelector';
 import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
 import ComparisonItem from '../components/Comparison/ComparisonItem'; // ComparisonItem now uses universal visualizer
@@ -15,10 +19,12 @@ const ComparisonPage = () => {
     const { allHistory, allHistoryStatus, error: historyError } = useSelector((state) => state.history);
     // Store IDs of the routes selected for comparison
     const [selectedRouteIds, setSelectedRouteIds] = useState([]);
+    // State to control the minimalist view toggle
+    const [isMinimalView, setIsMinimalView] = useState(false); // Default to detailed view
 
     // Fetch all history if it hasn't been fetched yet
     useEffect(() => {
-        if (allHistoryStatus === 'idle') {
+        if (allHistoryStatus === 'idle' || allHistoryStatus === 'failed') { // Fetch if idle or failed previously
             dispatch(fetchAllHistory());
         }
         // Optional: Reset error on unmount
@@ -28,6 +34,11 @@ const ComparisonPage = () => {
     // Handler for when the selection in ComparisonSelector changes
     const handleSelectionChange = (selectedIds) => {
         setSelectedRouteIds(selectedIds);
+    };
+
+    // Handler for toggling the minimal view
+    const handleViewToggle = () => {
+        setIsMinimalView(!isMinimalView);
     };
 
     // Filter the full history data based on the selected IDs
@@ -41,9 +52,26 @@ const ComparisonPage = () => {
 
     return (
         <Box>
-            <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 3 }}>
-                Compare Historical Traces
-            </Typography>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+                 <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 0 }}>
+                    Compare Historical Traces
+                 </Typography>
+                 {/* Toggle Button for Minimal View - Only show if routes are loaded */}
+                 {allHistoryStatus === 'succeeded' && (
+                    <Tooltip title={isMinimalView ? "Show Full Details" : "Show Minimal View (Hops Only)"}>
+                        <ToggleButton
+                            value="check"
+                            selected={isMinimalView}
+                            onChange={handleViewToggle}
+                            size="small"
+                            aria-label="Toggle minimal view"
+                        >
+                            {isMinimalView ? <ViewHeadlineIcon /> : <ViewCompactIcon />}
+                        </ToggleButton>
+                    </Tooltip>
+                 )}
+             </Stack>
+
 
             {/* Display error if history fetching failed */}
             {allHistoryStatus === 'failed' && (
@@ -67,6 +95,7 @@ const ComparisonPage = () => {
                              <RouteComparisonContainer
                                 traces={selectedRoutesData} // Pass the filtered historical data
                                 SectionComponent={ComparisonItem} // ComparisonItem renders HistoryTraceVisualizer internally
+                                isMinimalView={isMinimalView} // Pass the view mode state
                              />
                          </Box>
                     ) : (
@@ -77,7 +106,7 @@ const ComparisonPage = () => {
                             variant="outlined" // Use outlined for less emphasis
                             sx={{ mt: 3 }}
                          >
-                            Select two or more routes (Combined, Direct, or MAC) from the list above to compare them side-by-side.
+                            Select two or more routes (Combined, Direct, or MAC) from the list above to compare them side-by-side. Use the <ViewCompactIcon fontSize='small' sx={{verticalAlign: 'bottom', mx: 0.5}}/> button to toggle a minimal view.
                          </Alert>
                     )}
                 </>
@@ -87,3 +116,5 @@ const ComparisonPage = () => {
 };
 
 export default ComparisonPage;
+
+// ----- End File: src\pages\ComparisonPage.jsx -----

@@ -1,11 +1,13 @@
 // ----- File: src\components\RouteTrace\RouteComparisonContainer.jsx -----
+
 // Update Grid component to use Grid v2 API
 import React from 'react';
 import { Box, Grid, Alert } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 // Generic container for side-by-side comparison of trace sections
-const RouteComparisonContainer = ({ traces = [], SectionComponent }) => {
+// Now accepts and forwards isMinimalView prop
+const RouteComparisonContainer = ({ traces = [], SectionComponent, isMinimalView = false }) => {
   // Check if a valid SectionComponent was provided
   if (!SectionComponent) {
     console.error("RouteComparisonContainer requires a valid SectionComponent prop.");
@@ -17,6 +19,7 @@ const RouteComparisonContainer = ({ traces = [], SectionComponent }) => {
   }
 
   // Determine if the remove button should be shown in child sections
+  // (This depends on the calling context and slice capabilities, not relevant to minimalist view)
   const canRemove = traces.length > 1;
 
   // Define responsive grid sizing using Grid v2 direct props
@@ -41,9 +44,13 @@ const RouteComparisonContainer = ({ traces = [], SectionComponent }) => {
           // Child Grid components now use breakpoint props directly
           // Removed the 'item' prop
           <Grid {...columnProps} key={trace.id}>
-             {/* Render the provided SectionComponent, passing the trace data and canRemove flag */}
+             {/* Render the provided SectionComponent, passing the trace data, canRemove flag, AND isMinimalView */}
              {/* Ensure SectionComponent handles height/layout internally (e.g., height: '100%') */}
-             <SectionComponent trace={trace} canRemove={canRemove} />
+             <SectionComponent
+                trace={trace}
+                canRemove={canRemove} // Note: Removal logic depends on the specific slice implementation
+                isMinimalView={isMinimalView} // Pass down the view mode
+              />
           </Grid>
         ))}
       </Grid>

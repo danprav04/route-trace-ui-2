@@ -1,3 +1,5 @@
+// ----- File: src\components\Comparison\HistoryTraceVisualizer.jsx -----
+
 import React from 'react';
 import { Box, Typography, Stack, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Divider } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -73,7 +75,7 @@ const renderHopSection = (hops, title, icon, defaultExpanded = false) => {
 };
 
 
-const HistoryTraceVisualizer = ({ route }) => {
+const HistoryTraceVisualizer = ({ route, isMinimalView = false }) => { // Accept isMinimalView prop
     if (!route) return <Typography color="error">Invalid route data provided.</Typography>;
 
     const {
@@ -95,50 +97,59 @@ const HistoryTraceVisualizer = ({ route }) => {
     const vrf = inputDetails?.vrf; // Extract VRF if present in inputs
 
     return (
-        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-            {/* Header Info */}
-            <Paper elevation={0} variant="outlined" sx={{ p: 1.5, mb: 2 }}>
-                 <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    justifyContent="space-between"
-                    alignItems={{ xs: 'flex-start', sm: 'center' }}
-                    spacing={{ xs: 1, sm: 2 }}
-                    flexWrap="wrap"
-                 >
-                    {/* Source/Destination */}
-                    <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
-                             <Chip label={primarySourceLabel} size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
-                             <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{source || 'N/A'}</Typography>
-                             <Typography component="span" sx={{ mx: 1 }}>{separator}</Typography>
-                             <Chip label={primaryDestLabel} size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
-                             <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{destination || 'N/A'}</Typography>
-                        </Typography>
-                        {/* Display Trace Type and VRF if applicable */}
-                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-                            <Chip label={trace_type?.toUpperCase()} size="small" variant='filled' color="default" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 'medium' }} />
-                            {vrf && <Chip label={`VRF: ${vrf}`} size="small" variant='outlined' color="info" sx={{ height: 20, fontSize: '0.7rem' }} />}
-                        </Stack>
-                    </Box>
-                     {/* Timestamp/User/ID */}
-                     <Stack direction="column" alignItems={{ xs: 'flex-start', sm: 'flex-end' }} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-                         {user && (
-                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>
-                                User: {user.username}
+        // Conditionally adjust padding/margins based on minimal view
+        <Box sx={{
+            flexGrow: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            // Remove vertical padding in minimal view if ComparisonItem provides it
+            // py: isMinimalView ? 0 : 1,
+        }}>
+            {/* Header Info - Conditionally Rendered */}
+            { !isMinimalView && (
+                 <Paper elevation={0} variant="outlined" sx={{ p: 1.5, mb: 2 }}>
+                     <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        justifyContent="space-between"
+                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                        spacing={{ xs: 1, sm: 2 }}
+                        flexWrap="wrap"
+                     >
+                        {/* Source/Destination */}
+                        <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
+                                 <Chip label={primarySourceLabel} size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                                 <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{source || 'N/A'}</Typography>
+                                 <Typography component="span" sx={{ mx: 1 }}>{separator}</Typography>
+                                 <Chip label={primaryDestLabel} size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                                 <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{destination || 'N/A'}</Typography>
                             </Typography>
-                         )}
-                         <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>
-                             {formatTimestamp(timestamp, 'PPp')} {/* Readable format */}
-                         </Typography>
-                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', opacity: 0.7, lineHeight: 1.3 }}>
-                            (ID: {id})
-                         </Typography>
+                            {/* Display Trace Type and VRF if applicable */}
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                                <Chip label={trace_type?.toUpperCase()} size="small" variant='filled' color="default" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 'medium' }} />
+                                {vrf && <Chip label={`VRF: ${vrf}`} size="small" variant='outlined' color="info" sx={{ height: 20, fontSize: '0.7rem' }} />}
+                            </Stack>
+                        </Box>
+                         {/* Timestamp/User/ID */}
+                         <Stack direction="column" alignItems={{ xs: 'flex-start', sm: 'flex-end' }} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+                             {user && (
+                                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>
+                                    User: {user.username}
+                                </Typography>
+                             )}
+                             <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>
+                                 {formatTimestamp(timestamp, 'PPp')} {/* Readable format */}
+                             </Typography>
+                             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', opacity: 0.7, lineHeight: 1.3 }}>
+                                (ID: {id})
+                             </Typography>
+                        </Stack>
                     </Stack>
-                </Stack>
-            </Paper>
+                </Paper>
+            )}
 
-            {/* Input Details Accordion (Conditional) */}
-            {hasInputs && (
+            {/* Input Details Accordion - Conditionally Rendered */}
+            { !isMinimalView && hasInputs && (
                  <Accordion
                     elevation={0} variant="outlined"
                     sx={{ mb: 1 }}
@@ -165,21 +176,21 @@ const HistoryTraceVisualizer = ({ route }) => {
                  </Accordion>
             )}
 
-            {/* --- Trace Specific Visualizations --- */}
+            {/* --- Trace Specific Visualizations (Always Rendered) --- */}
 
             {/* Combined Trace */}
             {trace_type === 'combined' && (
                 <>
                     {/* Source L2 Path - Render only if data exists */}
                     {hasSourceMac && renderHopSection(sourceMacTrace, "Source MAC Path", <SettingsEthernetIcon />)}
-                    {/* Divider/Indicator - Render only if both sections above/below exist */}
-                    {hasSourceMac && hasMainRoute && (
+                    {/* Divider/Indicator - Render only if both sections exist AND not minimal view */}
+                    {hasSourceMac && hasMainRoute && !isMinimalView && (
                         <Box textAlign="center" sx={{ my: -0.5 }}><ArrowDownwardIcon fontSize="small" color="action" sx={{ opacity: 0.5 }} /></Box>
                     )}
                     {/* Main IP Path - Render only if data exists */}
-                    {hasMainRoute && renderHopSection(mainRouteTrace, "Main Route Path (IP Hops)", <AccountTreeIcon />, true)}
-                     {/* Divider/Indicator - Render only if both sections above/below exist */}
-                    {hasMainRoute && hasDestMac && (
+                    {hasMainRoute && renderHopSection(mainRouteTrace, "Main Route Path (IP Hops)", <AccountTreeIcon />, !isMinimalView)} {/* Expand by default only if not minimal */}
+                     {/* Divider/Indicator - Render only if both sections exist AND not minimal view */}
+                    {hasMainRoute && hasDestMac && !isMinimalView && (
                         <Box textAlign="center" sx={{ my: -0.5 }}><ArrowDownwardIcon fontSize="small" color="action" sx={{ opacity: 0.5 }} /></Box>
                     )}
                     {/* Destination L2 Path - Render only if data exists */}
@@ -198,7 +209,7 @@ const HistoryTraceVisualizer = ({ route }) => {
                  <>
                     {/* Only show Main Route Path - Render only if data exists */}
                     {hasMainRoute ? (
-                        renderHopSection(mainRouteTrace, "Direct Route Path", <AccountTreeIcon />, true)
+                        renderHopSection(mainRouteTrace, "Direct Route Path", <AccountTreeIcon />, !isMinimalView) // Expand by default only if not minimal
                     ) : (
                          <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
                              No detailed hop data available for this direct trace entry.
@@ -212,7 +223,7 @@ const HistoryTraceVisualizer = ({ route }) => {
                 <>
                     {/* Only show Source MAC Path (renamed for clarity) - Render only if data exists */}
                     {hasSourceMac ? (
-                        renderHopSection(sourceMacTrace, "MAC Trace Path", <SettingsEthernetIcon />, true)
+                        renderHopSection(sourceMacTrace, "MAC Trace Path", <SettingsEthernetIcon />, !isMinimalView) // Expand by default only if not minimal
                     ) : (
                          <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
                              No detailed hop data available for this MAC trace entry.
@@ -234,3 +245,5 @@ const HistoryTraceVisualizer = ({ route }) => {
 };
 
 export default HistoryTraceVisualizer;
+
+// ----- End File: src\components\Comparison\HistoryTraceVisualizer.jsx -----
