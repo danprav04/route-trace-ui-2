@@ -1,5 +1,7 @@
 // ----- File: src\components\RouteTrace\HopDisplay.jsx -----
 
+// ----- File: src\components\RouteTrace\HopDisplay.jsx -----
+
 import React, { useState } from 'react';
 import PropTypes from 'prop-types'; // Recommended for component documentation and validation
 import {
@@ -15,6 +17,7 @@ import {
     Divider,
     Tooltip,
     Stack, // Use Stack for better internal layout
+    alpha // Import alpha for transparent colors
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'; // Arrow for normal direction
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';     // Arrow for reversed direction display
@@ -64,9 +67,17 @@ const getTypeIcon = (type) => {
 /**
  * Displays information for a single hop in a network trace visualization.
  * Shows primary identifier (hostname/IP/MAC), secondary info (IP/MAC/Type),
- * and provides a popover for detailed information. Handles reversed display.
+ * and provides a popover for detailed information. Handles reversed display
+ * and highlights matching IPs in comparison mode.
  */
-const HopDisplay = ({ hopData, isFirst, isLast, isReversed = false }) => { // Added isReversed prop
+const HopDisplay = ({
+    hopData,
+    isFirst,
+    isLast,
+    isReversed = false,
+    isHighlightingActive = false, // Is highlighting mode enabled?
+    highlightedIPs = new Set()    // Set of IPs to highlight if mode is active
+}) => {
     const [anchorEl, setAnchorEl] = useState(null);
 
     const handlePopoverOpen = (event) => {
@@ -120,6 +131,9 @@ const HopDisplay = ({ hopData, isFirst, isLast, isReversed = false }) => { // Ad
         }
     };
 
+    // --- Highlighting Logic ---
+    const shouldHighlight = isHighlightingActive && ip && highlightedIPs.has(ip);
+
     return (
         <Box sx={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
             {/* Arrow Connector BEFORE (Normal Mode) */}
@@ -138,6 +152,12 @@ const HopDisplay = ({ hopData, isFirst, isLast, isReversed = false }) => { // Ad
                     borderRadius: 1.5, // Slightly more rounded corners
                     flexShrink: 0, // Prevent paper from shrinking excessively
                     overflow: 'hidden', // Ensure content fits
+                    transition: 'background-color 0.3s ease, border-color 0.3s ease', // Smooth transition for highlight
+                    // Apply highlight styles conditionally using theme-aware colors
+                    bgcolor: shouldHighlight ? (theme) => alpha(theme.palette.warning.light, 0.4) : undefined, // Use light warning bg from theme
+                    borderColor: shouldHighlight ? 'warning.main' : undefined, // Use main warning color for border
+                    // Optional: Add more emphasis like box shadow
+                    // boxShadow: shouldHighlight ? (theme) => `0 0 0 2px ${theme.palette.warning.main}` : undefined,
                 }}
             >
                 {/* Details Button (only show if there are details) */}
@@ -227,10 +247,13 @@ HopDisplay.propTypes = {
         hostname: PropTypes.string,
         type: PropTypes.string,
         rtt: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        // Add other expected fields if possible
     }).isRequired,
     isFirst: PropTypes.bool, // Is it the first *visual* item in the current sequence?
     isLast: PropTypes.bool,  // Is it the last *visual* item in the current sequence?
     isReversed: PropTypes.bool, // Is the overall trace display reversed?
+    isHighlightingActive: PropTypes.bool, // Is IP highlighting mode active?
+    highlightedIPs: PropTypes.instanceOf(Set), // Set of IPs to potentially highlight
 };
 
 // Default props for flags
@@ -238,6 +261,8 @@ HopDisplay.defaultProps = {
     isFirst: false,
     isLast: false,
     isReversed: false,
+    isHighlightingActive: false,
+    highlightedIPs: new Set(),
 };
 
 

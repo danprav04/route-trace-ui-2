@@ -1,7 +1,9 @@
 // ----- File: src\components\Comparison\HistoryTraceVisualizer.jsx -----
 
+// ----- File: src\components\Comparison\HistoryTraceVisualizer.jsx -----
+
 import React from 'react';
-import { Box, Typography, Stack, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Divider, Tooltip } from '@mui/material'; // Removed IconButton
+import { Box, Typography, Stack, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Divider, Tooltip, alpha } from '@mui/material'; // Added alpha
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoIcon from '@mui/icons-material/Info';
 import CodeIcon from '@mui/icons-material/Code'; // For input details
@@ -14,8 +16,16 @@ import HopDisplay from '../RouteTrace/HopDisplay'; // Reuse the hop display comp
 import { formatTimestamp } from '../../utils/formatters';
 
 // Helper to render a hop section (reusable for main, source mac, dest mac)
-// NOW accepts isReversed prop to reverse the hop order visually
-const renderHopSection = (hops, title, icon, defaultExpanded = false, isReversed = false) => { // Added isReversed parameter
+// NOW accepts isReversed, isHighlightingActive, and highlightedIPs props
+const renderHopSection = (
+    hops,
+    title,
+    icon,
+    defaultExpanded = false,
+    isReversed = false,
+    isHighlightingActive = false, // New prop
+    highlightedIPs = new Set()    // New prop
+) => {
     // Assumes hops is a non-empty array
     if (!hops || hops.length === 0) return null; // Return null if no hops
 
@@ -47,7 +57,8 @@ const renderHopSection = (hops, title, icon, defaultExpanded = false, isReversed
              </AccordionSummary>
              {/* AccordionDetails now acts as the scrolling container */}
              <AccordionDetails sx={{
-                bgcolor: 'action.hover',
+                // Use subtle background based on theme mode
+                bgcolor: (theme) => alpha(theme.palette.action.selected, 0.3), // Slightly tinted background for contrast
                 p: 1.5, // Add padding here
                 py: 2, // More vertical padding
                 borderTop: 1,
@@ -82,6 +93,9 @@ const renderHopSection = (hops, title, icon, defaultExpanded = false, isReversed
                              isLast={index === hopsToRender.length - 1}
                              // Pass isReversed down to HopDisplay so it can adjust arrow rendering
                              isReversed={isReversed}
+                             // Pass highlighting info down
+                             isHighlightingActive={isHighlightingActive}
+                             highlightedIPs={highlightedIPs}
                          />
                      ))}
                  </Stack>
@@ -95,6 +109,8 @@ const HistoryTraceVisualizer = ({
     route,
     isMinimalView = false,
     isReversed = false, // Accept isReversed prop
+    isHighlightingActive = false, // Accept highlighting state
+    highlightedIPs = new Set(),    // Accept set of IPs to highlight
     // onToggleReverse is no longer needed here
 }) => {
     if (!route) return <Typography color="error">Invalid route data provided.</Typography>;
@@ -214,7 +230,7 @@ const HistoryTraceVisualizer = ({
             )}
 
             {/* --- Trace Specific Visualizations (Always Rendered, Order respects actual trace) --- */}
-            {/* Pass isReversed down to renderHopSection */}
+            {/* Pass isReversed, isHighlightingActive, highlightedIPs down to renderHopSection */}
 
             {/* Combined Trace */}
             {trace_type === 'combined' && (
@@ -225,7 +241,9 @@ const HistoryTraceVisualizer = ({
                         isReversed ? "Visually Reversed Source MAC Path" : "Source MAC Path",
                         <SettingsEthernetIcon />,
                         false, // Default expansion (usually false for this)
-                        isReversed // Pass reverse state
+                        isReversed, // Pass reverse state
+                        isHighlightingActive, // Pass highlight state
+                        highlightedIPs // Pass highlighted IPs
                     )}
 
                     {/* Divider */}
@@ -239,7 +257,9 @@ const HistoryTraceVisualizer = ({
                         isReversed ? "Visually Reversed Main Route Path" : "Main Route Path (IP Hops)",
                         <AccountTreeIcon />,
                         defaultExpandMain, // Default expansion
-                        isReversed // Pass reverse state
+                        isReversed, // Pass reverse state
+                        isHighlightingActive, // Pass highlight state
+                        highlightedIPs // Pass highlighted IPs
                     )}
 
                      {/* Divider */}
@@ -253,7 +273,9 @@ const HistoryTraceVisualizer = ({
                          isReversed ? "Visually Reversed Destination MAC Path" : "Destination MAC Path",
                          <SettingsEthernetIcon />,
                          false, // Default expansion
-                         isReversed // Pass reverse state
+                         isReversed, // Pass reverse state
+                         isHighlightingActive, // Pass highlight state
+                         highlightedIPs // Pass highlighted IPs
                     )}
 
                     {/* No data message */}
@@ -273,7 +295,9 @@ const HistoryTraceVisualizer = ({
                         isReversed ? "Visually Reversed Direct Route Path" : "Direct Route Path",
                         <AccountTreeIcon />,
                         defaultExpandMain,
-                        isReversed
+                        isReversed,
+                        isHighlightingActive,
+                        highlightedIPs
                     )}
                     {!hasMainRoute && (
                          <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
@@ -291,7 +315,9 @@ const HistoryTraceVisualizer = ({
                         isReversed ? "Visually Reversed MAC Trace Path" : "MAC Trace Path",
                         <SettingsEthernetIcon />,
                         defaultExpandMain,
-                        isReversed
+                        isReversed,
+                        isHighlightingActive,
+                        highlightedIPs
                     )}
                     {!hasSourceMac && (
                          <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>

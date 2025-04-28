@@ -1,18 +1,22 @@
 // ----- File: src\components\RouteTrace\RouteComparisonContainer.jsx -----
 
+// ----- File: src\components\RouteTrace\RouteComparisonContainer.jsx -----
+
 // Update Grid component to use Grid v2 API
 import React from 'react';
 import { Box, Grid, Alert } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 // Generic container for side-by-side comparison of trace sections
-// Now accepts and forwards isMinimalView, reversedStates, and onToggleReverse props
+// Now accepts and forwards view modes, reverse states, and highlighting info
 const RouteComparisonContainer = ({
     traces = [],
     SectionComponent,
     isMinimalView = false,
     reversedStates = {}, // Default to empty object
-    onToggleReverse // Handler function
+    onToggleReverse, // Handler function for reversing
+    isHighlightingActive = false, // New: Highlighting state
+    highlightedIPs = new Set()     // New: Set of IPs to highlight
 }) => {
   // Check if a valid SectionComponent was provided
   if (!SectionComponent) {
@@ -51,7 +55,7 @@ const RouteComparisonContainer = ({
           // Removed the 'item' prop
           <Grid {...columnProps} key={trace.id}>
              {/* Render the provided SectionComponent */}
-             {/* Pass down all relevant props: trace data, view modes, handlers */}
+             {/* Pass down all relevant props: trace data, view modes, handlers, highlighting info */}
              <SectionComponent
                 trace={trace}
                 canRemove={canRemove} // Note: Removal logic depends on the specific slice implementation
@@ -60,6 +64,9 @@ const RouteComparisonContainer = ({
                 isReversed={reversedStates[trace.id] || false}
                 // Pass the handler function
                 onToggleReverse={onToggleReverse}
+                // Pass highlighting info down
+                isHighlightingActive={isHighlightingActive}
+                highlightedIPs={highlightedIPs}
               />
           </Grid>
         ))}

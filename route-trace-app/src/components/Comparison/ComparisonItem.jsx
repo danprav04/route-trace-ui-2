@@ -1,14 +1,23 @@
 // ----- File: src\components\Comparison\ComparisonItem.jsx -----
 
+// ----- File: src\components\Comparison\ComparisonItem.jsx -----
+
 import React from 'react';
 import { Paper, IconButton, Tooltip } from '@mui/material'; // Added IconButton, Tooltip
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz'; // Correct icon
 import HistoryTraceVisualizer from './HistoryTraceVisualizer'; // Use the universal visualizer
 
 // This component acts as a container for a single historical trace within the comparison view.
-// It now receives processed history entry, view modes, and reverse handler.
+// It now receives processed history entry, view modes, reverse handler, and highlighting info.
 // It will now contain the reverse button itself.
-const ComparisonItem = ({ trace, isMinimalView, isReversed, onToggleReverse }) => {
+const ComparisonItem = ({
+    trace,
+    isMinimalView,
+    isReversed,
+    onToggleReverse,
+    isHighlightingActive, // New: Highlighting state
+    highlightedIPs        // New: Set of IPs to highlight
+}) => {
     // 'trace' prop comes from ComparisonPage
     if (!trace) return null;
 
@@ -49,12 +58,13 @@ const ComparisonItem = ({ trace, isMinimalView, isReversed, onToggleReverse }) =
              )}
 
             {/* The main visualizer for the historical route */}
-            {/* Pass the full trace object AND view modes + reverse state */}
-            {/* No need to pass onToggleReverse down anymore */}
+            {/* Pass the full trace object AND view modes, reverse state, and highlighting info */}
             <HistoryTraceVisualizer
                 route={trace}
                 isMinimalView={isMinimalView}
                 isReversed={isReversed}
+                isHighlightingActive={isHighlightingActive} // Pass down
+                highlightedIPs={highlightedIPs}             // Pass down
              />
         </Paper>
     );
