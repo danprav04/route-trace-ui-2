@@ -1,165 +1,154 @@
 // ----- File: src\pages\ComparisonPage.jsx -----
 
-// ----- File: src\pages\ComparisonPage.jsx -----
-
-import React, { useState, useEffect, useMemo } from 'react'; // Added useMemo
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Box, Typography, Alert, Paper, Stack, ToggleButton, Tooltip, Button } from '@mui/material'; // Added Button
+import {
+    Box, Typography, Alert, Paper, Stack, ToggleButton, Tooltip, Button,
+    colors, // Import MUI colors object
+    alpha // Import alpha for background colors
+} from '@mui/material';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
-import ViewCompactIcon from '@mui/icons-material/ViewCompact'; // Icon for minimal view
-import ViewHeadlineIcon from '@mui/icons-material/ViewHeadline'; // Icon for detailed view
-import PaletteIcon from '@mui/icons-material/Palette'; // Icon for highlighting
-import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined'; // Icon for highlighting (inactive)
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz'; // <-- Import added here
+import ViewCompactIcon from '@mui/icons-material/ViewCompact';
+import ViewHeadlineIcon from '@mui/icons-material/ViewHeadline';
+import PaletteIcon from '@mui/icons-material/Palette';
+import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ComparisonSelector from '../components/Comparison/ComparisonSelector';
 import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
-import ComparisonItem from '../components/Comparison/ComparisonItem'; // ComparisonItem now uses universal visualizer
+import ComparisonItem from '../components/Comparison/ComparisonItem';
 import LoadingSpinner from '../components/Common/LoadingSpinner';
 import ErrorMessage from '../components/Common/ErrorMessage';
 import { fetchAllHistory, resetHistoryError } from '../store/slices/historySlice';
 
+// Define a palette of distinct colors for highlighting IPs
+// Using MUI color names. Adjust shades as needed (e.g., 400/500/600).
+const HIGHLIGHT_COLORS = [
+  colors.red[500],
+  colors.blue[500],
+  colors.green[600], // Darker green for better contrast potentially
+  colors.purple[500],
+  colors.orange[600],
+  colors.cyan[500],
+  colors.pink[400],
+  colors.teal[500],
+  colors.lime[700], // Darker lime
+  colors.indigo[400],
+  colors.amber[600],
+  colors.lightBlue[500],
+];
+
 const ComparisonPage = () => {
     const dispatch = useDispatch();
-    // Use allHistory which contains processed entries of all types
     const { allHistory, allHistoryStatus, error: historyError } = useSelector((state) => state.history);
-    // Store IDs of the routes selected for comparison
     const [selectedRouteIds, setSelectedRouteIds] = useState([]);
-    // State to control the minimalist view toggle
-    const [isMinimalView, setIsMinimalView] = useState(false); // Default to detailed view
-    // State to track the reversed display status for each selected trace
-    const [reversedStates, setReversedStates] = useState({}); // { [traceId]: boolean }
-    // State to control IP highlighting
-    const [isHighlightingActive, setIsHighlightingActive] = useState(false); // Default: off
+    const [isMinimalView, setIsMinimalView] = useState(false);
+    const [reversedStates, setReversedStates] = useState({});
+    const [isHighlightingActive, setIsHighlightingActive] = useState(false);
 
-    // Fetch all history if it hasn't been fetched yet
     useEffect(() => {
-        if (allHistoryStatus === 'idle' || allHistoryStatus === 'failed') { // Fetch if idle or failed previously
+        if (allHistoryStatus === 'idle' || allHistoryStatus === 'failed') {
             dispatch(fetchAllHistory());
         }
-        // Optional: Reset error on unmount
-        // return () => { dispatch(resetHistoryError()); };
     }, [allHistoryStatus, dispatch]);
 
-    // Filter the full history data based on the selected IDs
-    // This derived state will be passed to the comparison container
     const selectedRoutesData = useMemo(() => {
         return allHistory.filter(route => selectedRouteIds.includes(route.id));
     }, [allHistory, selectedRouteIds]);
 
-
-    // Calculate which IPs appear in multiple selected traces
-    const highlightedIPs = useMemo(() => {
+    // Calculate shared IPs and the color map
+    const { highlightedIPs, ipColorMap } = useMemo(() => {
         if (selectedRoutesData.length <= 1) {
-            return new Set(); // No need to highlight if <= 1 trace selected
+            return { highlightedIPs: new Set(), ipColorMap: new Map() };
         }
 
         const ipCounts = new Map();
-
         selectedRoutesData.forEach(trace => {
             const allHops = [
                 ...(trace.mainRouteTrace || []),
                 ...(trace.sourceMacTrace || []),
                 ...(trace.destinationMacTrace || []),
             ];
-            // Count each IP only once per trace to find IPs present in *multiple traces*
-            const uniqueIPsInTrace = new Set();
-            allHops.forEach(hop => {
-                if (hop?.ip) {
-                    uniqueIPsInTrace.add(hop.ip);
-                }
-            });
-
+            const uniqueIPsInTrace = new Set(allHops.map(hop => hop?.ip).filter(Boolean));
             uniqueIPsInTrace.forEach(ip => {
                 ipCounts.set(ip, (ipCounts.get(ip) || 0) + 1);
             });
         });
 
         const ipsToHighlight = new Set();
+        const colorMap = new Map();
+        let colorIndex = 0;
+
         for (const [ip, count] of ipCounts.entries()) {
-            // Highlight IPs appearing in *more than one* of the selected traces
             if (count > 1) {
                 ipsToHighlight.add(ip);
+                // Assign color from palette, wrapping around if necessary
+                colorMap.set(ip, HIGHLIGHT_COLORS[colorIndex % HIGHLIGHT_COLORS.length]);
+                colorIndex++;
             }
         }
-        // console.log("IPs to Highlight:", ipsToHighlight); // For debugging
-        return ipsToHighlight;
+        // console.log("IPs to Highlight:", ipsToHighlight);
+        // console.log("IP Color Map:", colorMap);
+        return { highlightedIPs: ipsToHighlight, ipColorMap: colorMap };
 
-    }, [selectedRoutesData]); // Recalculate when selected data changes
+    }, [selectedRoutesData]); // Recalculate only when selected data changes
 
-    // Handler for when the selection in ComparisonSelector changes
+
     const handleSelectionChange = (selectedIds) => {
         setSelectedRouteIds(selectedIds);
-        // Optional: Reset reversed states when selection changes?
-        // setReversedStates({});
-        // Reset highlighting when selection changes to avoid confusion
-        setIsHighlightingActive(false);
+        setIsHighlightingActive(false); // Reset highlighting on selection change
     };
 
-    // Handler for toggling the minimal view
-    const handleViewToggle = () => {
-        setIsMinimalView(!isMinimalView);
-    };
-
-    // Handler for toggling the reverse display of a specific trace item
+    const handleViewToggle = () => setIsMinimalView(!isMinimalView);
+    const handleHighlightToggle = () => setIsHighlightingActive(!isHighlightingActive);
     const handleToggleReverse = (traceId) => {
-        setReversedStates(prev => ({
-            ...prev,
-            [traceId]: !prev[traceId] // Toggle the boolean value for the specific id
-        }));
+        setReversedStates(prev => ({ ...prev, [traceId]: !prev[traceId] }));
     };
 
-    // Handler for toggling the IP highlighting mode
-    const handleHighlightToggle = () => {
-        setIsHighlightingActive(!isHighlightingActive);
-    };
-
-
-    // Show loading spinner while fetching history
     if (allHistoryStatus === 'loading') {
         return <LoadingSpinner message="Loading route history..." />;
     }
 
     const canCompare = selectedRoutesData.length >= 2;
+    const canHighlight = canCompare && highlightedIPs.size > 0;
 
     return (
         <Box>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                 <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 0 }}>
+                <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 0 }}>
                     Compare Historical Traces
-                 </Typography>
-                 {/* View Control Buttons */}
-                 {allHistoryStatus === 'succeeded' && (
+                </Typography>
+                {allHistoryStatus === 'succeeded' && (
                     <Stack direction="row" spacing={1}>
                         {/* Highlight Toggle */}
-                        <Tooltip title={isHighlightingActive ? "Disable IP Highlighting" : "Highlight IPs Appearing in Multiple Traces"}>
-                           <span> {/* Wrap for tooltip when disabled */}
+                        <Tooltip title={isHighlightingActive ? "Disable IP Highlighting" : (canHighlight ? "Highlight Common IPs (Unique Colors)" : "No common IPs found to highlight")}>
+                           <span>
                              <ToggleButton
                                 value="highlight"
                                 selected={isHighlightingActive}
                                 onChange={handleHighlightToggle}
                                 size="small"
                                 aria-label="Toggle IP highlighting"
-                                disabled={!canCompare || highlightedIPs.size === 0} // Disable if < 2 traces or no IPs to highlight
+                                disabled={!canHighlight} // Disable if < 2 traces or no IPs to highlight
                             >
                                 {isHighlightingActive ? <PaletteIcon color="warning"/> : <PaletteOutlinedIcon />}
                              </ToggleButton>
                            </span>
                         </Tooltip>
-
                         {/* Minimal View Toggle */}
                         <Tooltip title={isMinimalView ? "Show Full Details" : "Show Minimal View (Hops Only)"}>
+                           <span>
                             <ToggleButton
                                 value="minimal"
                                 selected={isMinimalView}
                                 onChange={handleViewToggle}
                                 size="small"
                                 aria-label="Toggle minimal view"
-                                disabled={selectedRoutesData.length === 0} // Disable if nothing selected
+                                disabled={selectedRoutesData.length === 0}
                             >
                                 {isMinimalView ? <ViewHeadlineIcon /> : <ViewCompactIcon />}
                             </ToggleButton>
+                           </span>
                         </Tooltip>
-
                         {/* Reset View Button */}
                         <Tooltip title="Reset Minimal View & Reversed Traces">
                            <span>
@@ -168,7 +157,7 @@ const ComparisonPage = () => {
                                 variant='outlined'
                                 onClick={() => { setIsMinimalView(false); setReversedStates({}); }}
                                 disabled={selectedRoutesData.length === 0}
-                                sx={{ minWidth: 'auto', px: 1 }} // Compact button
+                                sx={{ minWidth: 'auto', px: 1 }}
                              >
                                 Reset View
                              </Button>
@@ -178,47 +167,35 @@ const ComparisonPage = () => {
                  )}
              </Stack>
 
-
-            {/* Display error if history fetching failed */}
             {allHistoryStatus === 'failed' && (
                 <ErrorMessage error={historyError} title="Could not load route history" />
             )}
 
-            {/* Render selector and comparison container only if history loaded successfully */}
             {allHistoryStatus === 'succeeded' && (
                 <>
-                    {/* Component to select routes from the available history */}
                     <ComparisonSelector
-                        availableRoutes={allHistory} // Pass all history entries
+                        availableRoutes={allHistory}
                         selectedIds={selectedRouteIds}
                         onChange={handleSelectionChange}
                     />
 
-                    {/* Display the comparison container if routes are selected */}
                     {selectedRoutesData.length > 0 ? (
                          <Box sx={{ mt: 3 }}>
-                             {/* Container responsible for laying out the comparison items */}
-                             {/* Pass view modes, reverse states, highlight state + data, and handlers down */}
                              <RouteComparisonContainer
-                                traces={selectedRoutesData} // Pass the filtered historical data
-                                SectionComponent={ComparisonItem} // ComparisonItem renders HistoryTraceVisualizer internally
-                                isMinimalView={isMinimalView} // Pass the view mode state
-                                reversedStates={reversedStates} // Pass the reverse states object
-                                onToggleReverse={handleToggleReverse} // Pass the reverse handler
-                                isHighlightingActive={isHighlightingActive} // Pass highlight active state
-                                highlightedIPs={highlightedIPs}             // Pass set of IPs to highlight
+                                traces={selectedRoutesData}
+                                SectionComponent={ComparisonItem}
+                                isMinimalView={isMinimalView}
+                                reversedStates={reversedStates}
+                                onToggleReverse={handleToggleReverse}
+                                isHighlightingActive={isHighlightingActive} // Pass highlight state
+                                highlightedIPs={highlightedIPs}             // Pass set of IPs (still useful for check)
+                                ipColorMap={ipColorMap}                     // Pass the new color map
                              />
                          </Box>
                     ) : (
-                        // Show an informational message if no routes are selected yet
-                         <Alert
-                            severity="info"
-                            icon={<CompareArrowsIcon />}
-                            variant="outlined" // Use outlined for less emphasis
-                            sx={{ mt: 3 }}
-                         >
-                            Select two or more routes (Combined, Direct, or MAC) from the list above to compare them side-by-side.
-                            Use the <PaletteOutlinedIcon fontSize='small' sx={{verticalAlign: 'bottom', mx: 0.5}}/> button (enabled when applicable) to highlight devices (by IP) appearing in multiple selected traces.
+                         <Alert severity="info" icon={<CompareArrowsIcon />} variant="outlined" sx={{ mt: 3 }}>
+                            Select two or more routes from the list above to compare them side-by-side.
+                            Use the <PaletteOutlinedIcon fontSize='small' sx={{verticalAlign: 'bottom', mx: 0.5}}/> button (enabled when applicable) to highlight devices (by IP) appearing in multiple selected traces with unique colors.
                             Use <ViewCompactIcon fontSize='small' sx={{verticalAlign: 'bottom', mx: 0.5}}/> to toggle a minimal view.
                             Individual traces can be visually reversed using the swap icon (<SwapHorizIcon fontSize='small' sx={{verticalAlign: 'bottom'}}/>) in their header.
                          </Alert>
@@ -230,5 +207,3 @@ const ComparisonPage = () => {
 };
 
 export default ComparisonPage;
-
-// ----- End File: src\pages\ComparisonPage.jsx -----
