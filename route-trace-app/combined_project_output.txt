@@ -613,8 +613,9 @@ Disallow:
 
 // ----- File: src\App.js -----
 
-// ----- File: src\App.js -----
-// ----- File: src\App.js -----
+// ----- File: src/App.js -----
+// ----- File: src/App.js -----
+// ----- File: src/App.js -----
 import React, { useState, useMemo } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import {
@@ -712,15 +713,18 @@ function App() {
           sx={{
             flexGrow: 1,
             width: isAuthenticated ? { sm: `calc(100% - ${drawerWidth}px)` } : '100%',
-            // Add Toolbar height for spacing below the potential mobile AppBar
-            // Use Container to center content and provide max width if desired
-            // For full-width pages, you might remove Container or adjust its props
+            display: 'flex', // Enable flex column for content layout
+            flexDirection: 'column', // Stack AppBar spacer and Container
+            // --- Added for vertical scrolling ---
+            height: '100vh', // Ensure main area tries to take full viewport height
+            overflowY: 'auto', // Allow vertical scrolling if content exceeds height
+            // ------------------------------------
           }}
         >
            {/* Mobile-only AppBar */}
            {isAuthenticated && (
                 <AppBar
-                    position="fixed"
+                    position="fixed" // Keep mobile AppBar fixed
                     elevation={1} // Subtle elevation
                     sx={{
                         width: { sm: `calc(100% - ${drawerWidth}px)` },
@@ -728,6 +732,7 @@ function App() {
                         display: { xs: 'block', sm: 'none' }, // Show only on extra-small screens
                         backdropFilter: 'blur(8px)', // Optional: Add blur effect
                         backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(18, 18, 18, 0.7)' : 'rgba(255, 255, 255, 0.7)',
+                        zIndex: (theme) => theme.zIndex.drawer + 1, // Ensure it's above the sidebar on mobile
                     }}
                 >
                     <Toolbar>
@@ -750,11 +755,11 @@ function App() {
 
              {/* Add a Toolbar component here to create space below the fixed AppBar
                  Only necessary if the AppBar is always visible (e.g., even on desktop),
-                 or if the mobile AppBar exists. */}
-            <Toolbar sx={{ display: { xs: 'block', sm: 'none' }}} /> {/* Spacer for mobile app bar */}
+                 or if the mobile AppBar exists. Needs to be inside the scrolling Box. */}
+            <Toolbar sx={{ display: { xs: 'block', sm: 'none' }, flexShrink: 0 }} /> {/* Spacer for mobile app bar */}
 
-            {/* Page Content Container */}
-            <Container maxWidth="xl" sx={{ py: 3, px: {xs: 2, sm: 3} }}>
+            {/* Page Content Container - Allow this to grow and push footer (if any) down */}
+            <Container maxWidth="xl" sx={{ py: 3, px: {xs: 2, sm: 3}, flexGrow: 1 }}>
                 <Routes>
                     <Route path="/login" element={<LoginPage />} />
 
@@ -778,7 +783,7 @@ function App() {
 
 export default App;
 
-// ----- End File: src\App.js -----
+// ----- End File: src/App.js -----
 
 // ----- End File: src\App.js -----
 

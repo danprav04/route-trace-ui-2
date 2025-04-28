@@ -1,4 +1,6 @@
 // ----- File: src\pages\AllRoutesPage.jsx -----
+
+// ----- File: src\pages\AllRoutesPage.jsx -----
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Typography, Box } from '@mui/material';
@@ -12,25 +14,18 @@ const AllRoutesPage = () => {
   // Select relevant state from history slice
   const { allHistory, allHistoryStatus, error } = useSelector((state) => state.history);
 
-  // Fetch data when component mounts if status is idle
+  // Fetch data when component mounts UNLESS it's already loading.
+  // This ensures data is refreshed on subsequent visits.
   useEffect(() => {
-    if (allHistoryStatus === 'idle') {
+    if (allHistoryStatus !== 'loading') {
       dispatch(fetchAllHistory());
     }
-     // Clear errors when component unmounts or dependencies change
-     return () => {
-        // Only reset if the status indicates a completed fetch (or error)
-        // to avoid resetting during loading or initial idle state.
-        // if (allHistoryStatus === 'succeeded' || allHistoryStatus === 'failed') {
-        //     dispatch(resetHistoryError()); // Consider if resetting error on unmount is desired UX
-        // }
-    }
-  }, [allHistoryStatus, dispatch]);
+    // Optional: Clear errors when component unmounts
+    // return () => { dispatch(resetHistoryError()); };
+  }, [dispatch]); // Depend only on dispatch to re-run fetch on every mount
 
-  // Handle loading state
-  if (allHistoryStatus === 'loading') {
-      return <LoadingSpinner message="Loading all routes history..." />;
-  }
+  // Show loading spinner only when status is explicitly 'loading'
+  const isLoading = allHistoryStatus === 'loading';
 
   return (
     <Box>
@@ -38,17 +33,20 @@ const AllRoutesPage = () => {
             All User Routes History
         </Typography>
 
+        {/* Show loading spinner */}
+        {isLoading && <LoadingSpinner message="Loading all routes history..." />}
+
         {/* Display error if fetching failed */}
-        {allHistoryStatus === 'failed' && (
+        {allHistoryStatus === 'failed' && error && (
             <ErrorMessage
                 error={error}
                 title="Could Not Load History"
              />
         )}
 
-        {/* Display the history list if loading succeeded */}
+        {/* Display the history list if loading succeeded or if data is already present (even if idle/failed after a previous fetch) */}
         {/* HistoryList component handles the case of empty routes internally */}
-        {allHistoryStatus === 'succeeded' && (
+        {!isLoading && (
             <HistoryList
                 routes={allHistory}
                 title="All Recorded Traces" // More specific title
