@@ -1290,32 +1290,65 @@ export default Sidebar;
 
 // ----- File: src\components\Comparison\ComparisonItem.jsx -----
 
-import React from 'react';
-import { Paper } from '@mui/material';
-import HistoryTraceVisualizer from './HistoryTraceVisualizer'; // Use the universal visualizer
+// ----- File: src\components\Comparison\ComparisonItem.jsx -----
 
-// This component acts as a container for a single historical trace within the comparison view.
-// It now receives a processed history entry which includes the trace_type.
-const ComparisonItem = ({ trace }) => {
-    // 'trace' prop comes from ComparisonPage, which is historical data processed by historySlice
+import React from 'react';
+import { Paper, IconButton, Tooltip } from '@mui/material';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import HistoryTraceVisualizer from './HistoryTraceVisualizer';
+
+// Accepts and passes down highlighting info including ipColorMap
+const ComparisonItem = ({
+    trace,
+    isMinimalView,
+    isReversed,
+    onToggleReverse,
+    isHighlightingActive, // Highlighting state
+    highlightedIPs,       // Set of IPs
+    ipColorMap            // New: IP to Color map
+}) => {
     if (!trace) return null;
 
     return (
-        // Use Paper for consistent styling with other sections
-        // Set height to 100% to fill Grid item space if needed for alignment
         <Paper
             elevation={2}
             sx={{
-                p: { xs: 1.5, sm: 2 }, // Responsive padding
+                p: { xs: 1.5, sm: 2 },
                 mb: 3,
-                height: '100%', // Fill height of the grid container
-                display: 'flex', // Allow flex column layout
-                flexDirection: 'column'
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
             }}
         >
-            {/* The main visualizer for the historical route */}
-            {/* Pass the full trace object to the universal visualizer */}
-            <HistoryTraceVisualizer route={trace} />
+            {onToggleReverse && (
+                <Tooltip title={isReversed ? "Show Original Direction" : "Visually Reverse Direction"}>
+                    <IconButton
+                        onClick={() => onToggleReverse(trace.id)}
+                        size="small"
+                        aria-label="Reverse display direction"
+                        sx={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                            zIndex: 1,
+                            color: isReversed ? 'warning.main' : 'action.active'
+                         }}
+                    >
+                        <SwapHorizIcon fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+             )}
+
+            {/* Pass highlighting info down */}
+            <HistoryTraceVisualizer
+                route={trace}
+                isMinimalView={isMinimalView}
+                isReversed={isReversed}
+                isHighlightingActive={isHighlightingActive} // Pass down
+                highlightedIPs={highlightedIPs}             // Pass down
+                ipColorMap={ipColorMap}                     // Pass down
+             />
         </Paper>
     );
 };
@@ -1448,22 +1481,35 @@ export default ComparisonSelector;
 
 // ----- File: src\components\Comparison\HistoryTraceVisualizer.jsx -----
 
+// ----- File: src\components\Comparison\HistoryTraceVisualizer.jsx -----
+
 import React from 'react';
-import { Box, Typography, Stack, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Divider } from '@mui/material';
+import { Box, Typography, Stack, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Divider, Tooltip, alpha } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoIcon from '@mui/icons-material/Info';
-import CodeIcon from '@mui/icons-material/Code'; // For input details
-import AccountTreeIcon from '@mui/icons-material/AccountTree'; // Main Route
-import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // MAC Route
+import CodeIcon from '@mui/icons-material/Code';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import CompareArrowsIcon from '@mui/icons-material/CompareArrows'; // For MAC trace display
-import HopDisplay from '../RouteTrace/HopDisplay'; // Reuse the hop display component
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import HopDisplay from '../RouteTrace/HopDisplay';
 import { formatTimestamp } from '../../utils/formatters';
 
-// Helper to render a hop section (reusable for main, source mac, dest mac)
-// NOW includes horizontal scrolling wrapper - Adjusted Structure
-const renderHopSection = (hops, title, icon, defaultExpanded = false) => {
-    // Assumes hops is a non-empty array
+// Accepts and passes down ipColorMap to HopDisplay
+const renderHopSection = (
+    hops,
+    title,
+    icon,
+    defaultExpanded = false,
+    isReversed = false,
+    isHighlightingActive = false,
+    highlightedIPs = new Set(), // Keep this for quick check if needed
+    ipColorMap = new Map()      // New: IP to Color map
+) => {
+    if (!hops || hops.length === 0) return null;
+
+    const hopsToRender = isReversed ? [...hops].reverse() : hops;
 
     return (
         <Accordion
@@ -1480,40 +1526,41 @@ const renderHopSection = (hops, title, icon, defaultExpanded = false) => {
              >
                  {icon && React.cloneElement(icon, { sx: { mr: 1, color: 'action.active', fontSize: '1.2rem' } })}
                  <Typography variant="caption" fontWeight="medium">{title} ({hops.length} hops)</Typography>
+                 {isReversed && (
+                    <Tooltip title="Hop order visually reversed">
+                        <SwapHorizIcon fontSize="inherit" sx={{ ml: 0.5, color: 'warning.main', verticalAlign: 'middle' }} />
+                    </Tooltip>
+                 )}
              </AccordionSummary>
-             {/* AccordionDetails now acts as the scrolling container */}
              <AccordionDetails sx={{
-                bgcolor: 'action.hover',
-                p: 1.5, // Add padding here
-                py: 2, // More vertical padding
+                bgcolor: (theme) => alpha(theme.palette.action.selected, 0.3),
+                p: 1.5,
+                py: 2,
                 borderTop: 1,
                 borderColor: 'divider',
-                overflowX: 'auto', // Enable horizontal scroll on the details area itself
-                '&::-webkit-scrollbar': { // Basic scrollbar styling (optional)
-                    height: '8px',
-                },
+                overflowX: 'auto',
+                '&::-webkit-scrollbar': { height: '8px' },
                 '&::-webkit-scrollbar-thumb': {
                     backgroundColor: (theme) => theme.palette.action.disabled,
                     borderRadius: '4px',
                 },
              }}>
-                 {/* Stack directly inside the scrollable details */}
                  <Stack
                      direction="row"
-                     spacing={0} // Spacing handled by HopDisplay arrows
-                     alignItems="center" // Align hops vertically
-                     sx={{
-                         minWidth: 'max-content', // Crucial: Force Stack wider than container
-                         minHeight: 80,
-                         // Removed py here, handled by AccordionDetails padding
-                     }}
+                     spacing={0}
+                     alignItems="center"
+                     sx={{ minWidth: 'max-content', minHeight: 80 }}
                  >
-                     {hops.map((hop, index) => (
+                     {hopsToRender.map((hop, index) => (
                          <HopDisplay
-                             key={`${hop.device_id || hop.ip || hop.mac || `hop-${hop.hop}`}-${index}`} // More robust key
+                             key={`${hop.device_id || hop.ip || hop.mac || `hop-${hop.hop}`}-${index}-${isReversed}`}
                              hopData={hop}
                              isFirst={index === 0}
-                             isLast={index === hops.length - 1}
+                             isLast={index === hopsToRender.length - 1}
+                             isReversed={isReversed}
+                             isHighlightingActive={isHighlightingActive} // Pass down highlight state
+                             highlightedIPs={highlightedIPs}             // Pass down IP set (optional now)
+                             ipColorMap={ipColorMap}                     // Pass down color map
                          />
                      ))}
                  </Stack>
@@ -1522,8 +1569,15 @@ const renderHopSection = (hops, title, icon, defaultExpanded = false) => {
     );
 };
 
-
-const HistoryTraceVisualizer = ({ route }) => {
+// Accepts and passes down ipColorMap
+const HistoryTraceVisualizer = ({
+    route,
+    isMinimalView = false,
+    isReversed = false,
+    isHighlightingActive = false,
+    highlightedIPs = new Set(), // Keep for consistency if needed
+    ipColorMap = new Map(),     // New: Accept color map
+}) => {
     if (!route) return <Typography color="error">Invalid route data provided.</Typography>;
 
     const {
@@ -1531,84 +1585,64 @@ const HistoryTraceVisualizer = ({ route }) => {
         mainRouteTrace, sourceMacTrace, destinationMacTrace, inputDetails
     } = route;
 
-    // Determine primary identifiers based on trace type for header display
-    const primarySourceLabel = trace_type === 'direct' ? "Src GW" : (trace_type === 'mac' ? "Endpoint" : "Src IP");
-    const primaryDestLabel = trace_type === 'direct' ? "Dst GW" : (trace_type === 'mac' ? "Gateway" : "Dst IP");
+    let primarySourceLabel = trace_type === 'direct' ? "Src GW" : (trace_type === 'mac' ? "Endpoint" : "Src IP");
+    let primaryDestLabel = trace_type === 'direct' ? "Dst GW" : (trace_type === 'mac' ? "Gateway" : "Dst IP");
     const separator = trace_type === 'mac' ? '↔' : '→';
 
+    let displaySource = source;
+    let displayDest = destination;
+    if (isReversed) {
+        [displaySource, displayDest] = [destination, source];
+        [primarySourceLabel, primaryDestLabel] = [primaryDestLabel, primarySourceLabel];
+    }
 
-    // Check if data exists for different sections
     const hasMainRoute = mainRouteTrace && mainRouteTrace.length > 0;
     const hasSourceMac = sourceMacTrace && sourceMacTrace.length > 0;
     const hasDestMac = destinationMacTrace && destinationMacTrace.length > 0;
     const hasInputs = inputDetails && typeof inputDetails === 'object' && Object.keys(inputDetails).length > 0;
-    const vrf = inputDetails?.vrf; // Extract VRF if present in inputs
+    const vrf = inputDetails?.vrf;
+    const defaultExpandMain = !isMinimalView && !isReversed;
 
     return (
-        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', pt: isMinimalView ? 3 : 0 }}>
             {/* Header Info */}
-            <Paper elevation={0} variant="outlined" sx={{ p: 1.5, mb: 2 }}>
-                 <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    justifyContent="space-between"
-                    alignItems={{ xs: 'flex-start', sm: 'center' }}
-                    spacing={{ xs: 1, sm: 2 }}
-                    flexWrap="wrap"
-                 >
-                    {/* Source/Destination */}
-                    <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
-                             <Chip label={primarySourceLabel} size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
-                             <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{source || 'N/A'}</Typography>
-                             <Typography component="span" sx={{ mx: 1 }}>{separator}</Typography>
-                             <Chip label={primaryDestLabel} size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
-                             <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{destination || 'N/A'}</Typography>
-                        </Typography>
-                        {/* Display Trace Type and VRF if applicable */}
-                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-                            <Chip label={trace_type?.toUpperCase()} size="small" variant='filled' color="default" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 'medium' }} />
-                            {vrf && <Chip label={`VRF: ${vrf}`} size="small" variant='outlined' color="info" sx={{ height: 20, fontSize: '0.7rem' }} />}
-                        </Stack>
-                    </Box>
-                     {/* Timestamp/User/ID */}
-                     <Stack direction="column" alignItems={{ xs: 'flex-start', sm: 'flex-end' }} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-                         {user && (
-                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>
-                                User: {user.username}
+            { !isMinimalView && (
+                 <Paper elevation={0} variant="outlined" sx={{ p: 1.5, mb: 2, position: 'relative' }}>
+                     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={{ xs: 1, sm: 2 }} flexWrap="wrap">
+                        {/* Source/Destination */}
+                        <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
+                                 <Chip label={primarySourceLabel} size="small" color="primary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                                 <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{displaySource || 'N/A'}</Typography>
+                                 <Typography component="span" sx={{ mx: 1 }}>{separator}</Typography>
+                                 <Chip label={primaryDestLabel} size="small" color="secondary" variant="outlined" sx={{ height: 'auto', '& .MuiChip-label': { px: 0.8, py: 0.2, fontSize: '0.7rem' } }} />
+                                 <Typography component="span" sx={{ wordBreak: 'break-all', fontWeight: 500 }}>{displayDest || 'N/A'}</Typography>
                             </Typography>
-                         )}
-                         <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>
-                             {formatTimestamp(timestamp, 'PPp')} {/* Readable format */}
-                         </Typography>
-                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', opacity: 0.7, lineHeight: 1.3 }}>
-                            (ID: {id})
-                         </Typography>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                                <Chip label={trace_type?.toUpperCase()} size="small" variant='filled' color="default" sx={{ height: 20, fontSize: '0.7rem', fontWeight: 'medium' }} />
+                                {vrf && <Chip label={`VRF: ${vrf}`} size="small" variant='outlined' color="info" sx={{ height: 20, fontSize: '0.7rem' }} />}
+                                {isReversed && <Chip label="Reversed Display" size="small" variant='outlined' color="warning" sx={{ height: 20, fontSize: '0.65rem', fontStyle:'italic' }} icon={<SwapHorizIcon fontSize='inherit' />} />}
+                            </Stack>
+                        </Box>
+                         {/* Timestamp/User/ID */}
+                         <Stack direction="column" alignItems={{ xs: 'flex-start', sm: 'flex-end' }} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+                             {user && <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>User: {user.username}</Typography>}
+                             <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>{formatTimestamp(timestamp, 'PPp')}</Typography>
+                             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', opacity: 0.7, lineHeight: 1.3 }}>(ID: {id})</Typography>
+                        </Stack>
                     </Stack>
-                </Stack>
-            </Paper>
+                </Paper>
+            )}
 
-            {/* Input Details Accordion (Conditional) */}
-            {hasInputs && (
-                 <Accordion
-                    elevation={0} variant="outlined"
-                    sx={{ mb: 1 }}
-                    slotProps={{ transition: { unmountOnExit: true } }}
-                  >
-                     <AccordionSummary
-                        expandIcon={<ExpandMoreIcon />}
-                        aria-controls={`panel-inputs-${id}-content`}
-                        id={`panel-inputs-${id}-header`}
-                        sx={{ minHeight: '40px', '&.Mui-expanded': { minHeight: '40px' }, '& .MuiAccordionSummary-content': { my: 0.5, alignItems: 'center' } }}
-                     >
+            {/* Input Details Accordion */}
+            { !isMinimalView && hasInputs && (
+                 <Accordion elevation={0} variant="outlined" sx={{ mb: 1 }} slotProps={{ transition: { unmountOnExit: true } }}>
+                     <AccordionSummary expandIcon={<ExpandMoreIcon />} aria-controls={`panel-inputs-${id}-content`} id={`panel-inputs-${id}-header`} sx={{ minHeight: '40px', '&.Mui-expanded': { minHeight: '40px' }, '& .MuiAccordionSummary-content': { my: 0.5, alignItems: 'center' } }}>
                          <CodeIcon sx={{ mr: 1, color: 'action.active', fontSize: '1.2rem' }}/>
                          <Typography variant="caption" fontWeight="medium">Trace Input Parameters</Typography>
                      </AccordionSummary>
                      <AccordionDetails sx={{ bgcolor: 'action.hover', p: 1, borderTop: 1, borderColor: 'divider' }}>
-                         <pre style={{
-                             fontSize: '0.75rem', margin: 0, padding: '8px', borderRadius: '4px',
-                             overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-                             maxHeight: '200px', backgroundColor: (theme) => theme.palette.background.default,
-                         }}>
+                         <pre style={{ fontSize: '0.75rem', margin: 0, padding: '8px', borderRadius: '4px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: '200px', backgroundColor: (theme) => theme.palette.background.default }}>
                              {JSON.stringify(inputDetails, null, 2)}
                          </pre>
                      </AccordionDetails>
@@ -1616,69 +1650,32 @@ const HistoryTraceVisualizer = ({ route }) => {
             )}
 
             {/* --- Trace Specific Visualizations --- */}
-
-            {/* Combined Trace */}
+            {/* Pass highlighting info and color map down */}
             {trace_type === 'combined' && (
                 <>
-                    {/* Source L2 Path - Render only if data exists */}
-                    {hasSourceMac && renderHopSection(sourceMacTrace, "Source MAC Path", <SettingsEthernetIcon />)}
-                    {/* Divider/Indicator - Render only if both sections above/below exist */}
-                    {hasSourceMac && hasMainRoute && (
-                        <Box textAlign="center" sx={{ my: -0.5 }}><ArrowDownwardIcon fontSize="small" color="action" sx={{ opacity: 0.5 }} /></Box>
-                    )}
-                    {/* Main IP Path - Render only if data exists */}
-                    {hasMainRoute && renderHopSection(mainRouteTrace, "Main Route Path (IP Hops)", <AccountTreeIcon />, true)}
-                     {/* Divider/Indicator - Render only if both sections above/below exist */}
-                    {hasMainRoute && hasDestMac && (
-                        <Box textAlign="center" sx={{ my: -0.5 }}><ArrowDownwardIcon fontSize="small" color="action" sx={{ opacity: 0.5 }} /></Box>
-                    )}
-                    {/* Destination L2 Path - Render only if data exists */}
-                    {hasDestMac && renderHopSection(destinationMacTrace, "Destination MAC Path", <SettingsEthernetIcon />)}
-                    {/* Show message if no parts have data */}
-                    {!hasSourceMac && !hasMainRoute && !hasDestMac && (
-                         <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
-                            No detailed hop data available for this combined trace entry.
-                         </Typography>
-                    )}
+                    {renderHopSection(sourceMacTrace, isReversed ? "Visually Reversed Source MAC Path" : "Source MAC Path", <SettingsEthernetIcon />, false, isReversed, isHighlightingActive, highlightedIPs, ipColorMap)}
+                    {hasSourceMac && hasMainRoute && !isMinimalView && <Box textAlign="center" sx={{ my: -0.5 }}><ArrowDownwardIcon fontSize="small" color="action" sx={{ opacity: 0.5 }} /></Box>}
+                    {renderHopSection(mainRouteTrace, isReversed ? "Visually Reversed Main Route Path" : "Main Route Path (IP Hops)", <AccountTreeIcon />, defaultExpandMain, isReversed, isHighlightingActive, highlightedIPs, ipColorMap)}
+                    {hasMainRoute && hasDestMac && !isMinimalView && <Box textAlign="center" sx={{ my: -0.5 }}><ArrowDownwardIcon fontSize="small" color="action" sx={{ opacity: 0.5 }} /></Box>}
+                    {renderHopSection(destinationMacTrace, isReversed ? "Visually Reversed Destination MAC Path" : "Destination MAC Path", <SettingsEthernetIcon />, false, isReversed, isHighlightingActive, highlightedIPs, ipColorMap)}
+                    {!hasSourceMac && !hasMainRoute && !hasDestMac && <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>No detailed hop data available for this combined trace entry.</Typography>}
                 </>
             )}
-
-            {/* Direct Trace */}
             {trace_type === 'direct' && (
                  <>
-                    {/* Only show Main Route Path - Render only if data exists */}
-                    {hasMainRoute ? (
-                        renderHopSection(mainRouteTrace, "Direct Route Path", <AccountTreeIcon />, true)
-                    ) : (
-                         <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
-                             No detailed hop data available for this direct trace entry.
-                         </Typography>
-                    )}
+                    {renderHopSection(mainRouteTrace, isReversed ? "Visually Reversed Direct Route Path" : "Direct Route Path", <AccountTreeIcon />, defaultExpandMain, isReversed, isHighlightingActive, highlightedIPs, ipColorMap)}
+                    {!hasMainRoute && <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>No detailed hop data available for this direct trace entry.</Typography>}
                  </>
             )}
-
-            {/* MAC Trace */}
             {trace_type === 'mac' && (
                 <>
-                    {/* Only show Source MAC Path (renamed for clarity) - Render only if data exists */}
-                    {hasSourceMac ? (
-                        renderHopSection(sourceMacTrace, "MAC Trace Path", <SettingsEthernetIcon />, true)
-                    ) : (
-                         <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>
-                             No detailed hop data available for this MAC trace entry.
-                         </Typography>
-                    )}
+                    {renderHopSection(sourceMacTrace, isReversed ? "Visually Reversed MAC Trace Path" : "MAC Trace Path", <SettingsEthernetIcon />, defaultExpandMain, isReversed, isHighlightingActive, highlightedIPs, ipColorMap)}
+                    {!hasSourceMac && <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic' }}>No detailed hop data available for this MAC trace entry.</Typography>}
                 </>
             )}
-
-            {/* Fallback if trace type is unknown */}
             {trace_type !== 'combined' && trace_type !== 'direct' && trace_type !== 'mac' && (
-                <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic', alignSelf: 'center' }}>
-                    No detailed visualization available for this trace type ({trace_type || 'Unknown'}).
-                </Typography>
+                <Typography color="text.secondary" sx={{ p: 2, textAlign: 'center', fontStyle: 'italic', alignSelf: 'center' }}>No detailed visualization available for this trace type ({trace_type || 'Unknown'}).</Typography>
             )}
-
-
         </Box>
     );
 };
@@ -2268,175 +2265,102 @@ export default DirectRouteVisualizer;
 // ----- File: src\components\RouteTrace\HopDisplay.jsx -----
 
 // ----- File: src\components\RouteTrace\HopDisplay.jsx -----
+
 import React, { useState } from 'react';
-import PropTypes from 'prop-types'; // Recommended for component documentation and validation
+import PropTypes from 'prop-types';
 import {
-    Paper,
-    Typography,
-    Box,
-    Chip,
-    IconButton,
-    Popover,
-    List,
-    ListItem,
-    ListItemText,
-    Divider,
-    Tooltip,
-    Stack, // Use Stack for better internal layout
+    Paper, Typography, Box, Chip, IconButton, Popover, List, ListItem,
+    ListItemText, Divider, Tooltip, Stack, alpha, useTheme // Added useTheme
 } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import NetworkWifiIcon from '@mui/icons-material/NetworkWifi'; // Keep for potential future use or different types
 import RouterIcon from '@mui/icons-material/Router';
 import ComputerIcon from '@mui/icons-material/Computer';
-import DeviceUnknownIcon from '@mui/icons-material/DeviceUnknown'; // Default icon
-import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet'; // Switch/Bridge icon
-import SecurityIcon from '@mui/icons-material/Security'; // Potential Firewall icon
+import DeviceUnknownIcon from '@mui/icons-material/DeviceUnknown';
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet';
+import SecurityIcon from '@mui/icons-material/Security';
+import NetworkWifiIcon from '@mui/icons-material/NetworkWifi';
 
-// Helper to format keys for display in Popover (improved robustness)
+
 const formatDetailKey = (key) => {
     if (typeof key !== 'string' || !key) return '';
-    return key
-        .replace(/_/g, ' ') // Replace underscores with spaces
-        .replace(/([A-Z])/g, ' $1') // Add space before capitals (for camelCase)
-        .replace(/^./, (str) => str.toUpperCase()) // Capitalize first letter
-        .trim(); // Remove potential leading/trailing whitespace
+    return key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()).trim();
 };
 
-// Helper to get an icon based on hop type (enhanced with more types and map)
 const getTypeIcon = (type) => {
     const lowerType = type?.toLowerCase() || '';
-
-    // Map for clearer association and easier extension
     const iconMap = {
         router: <RouterIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />,
         gateway: <RouterIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />,
-        firewall: <SecurityIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />, // Dedicated FW icon
+        firewall: <SecurityIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />,
         host: <ComputerIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />,
         endpoint: <ComputerIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />,
-        server: <ComputerIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />, // Alias for host/endpoint
+        server: <ComputerIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />,
         switch: <SettingsEthernetIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />,
         bridge: <SettingsEthernetIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />,
-        'l3 switch': <SettingsEthernetIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />, // Handle multi-word types
-        wifi: <NetworkWifiIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />, // Example for Wifi type
-        // Add more specific checks based on your network device types
+        'l3 switch': <SettingsEthernetIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />,
+        wifi: <NetworkWifiIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />,
     };
-
-    // Find the first matching key in the map
     const matchedKey = Object.keys(iconMap).find(key => lowerType.includes(key));
-
     return matchedKey ? iconMap[matchedKey] : <DeviceUnknownIcon fontSize="inherit" sx={{ verticalAlign: 'middle' }} />;
 };
 
 /**
- * Displays information for a single hop in a network trace visualization.
- * Shows primary identifier (hostname/IP/MAC), secondary info (IP/MAC/Type),
- * and provides a popover for detailed information.
+ * Displays a single hop, handling reversed display and highlighting matching IPs
+ * with unique colors in comparison mode.
  */
-const HopDisplay = ({ hopData, isFirst, isLast }) => {
+const HopDisplay = ({
+    hopData,
+    isFirst,
+    isLast,
+    isReversed = false,
+    isHighlightingActive = false,
+    // highlightedIPs = new Set(), // This set is implicitly represented by ipColorMap keys
+    ipColorMap = new Map()        // New: Map of IP -> color string
+}) => {
     const [anchorEl, setAnchorEl] = useState(null);
+    const theme = useTheme(); // Access theme for mode-aware colors
 
-    const handlePopoverOpen = (event) => {
-        setAnchorEl(event.currentTarget);
-    };
-
-    const handlePopoverClose = () => {
-        setAnchorEl(null);
-    };
-
+    const handlePopoverOpen = (event) => setAnchorEl(event.currentTarget);
+    const handlePopoverClose = () => setAnchorEl(null);
     const open = Boolean(anchorEl);
 
-    // --- Validate hopData ---
     if (!hopData) {
-        // Optionally return null or a placeholder if data is missing
         console.warn('HopDisplay received null or undefined hopData.');
-        return null; // Or render an error/placeholder state
+        return null;
     }
 
-    // --- Extract Data ---
-    // Destructure known fields and collect the rest
-    const {
-        hop, // Required: The hop number
-        ip,
-        type,
-        hostname,
-        destination_network,
-        vrf,
-        destination_dg_ip,
-        mpls_label,
-        passed_firewall,
-        device_id,
-        destination_mac,
-        next_hop_interface,
-        nexthop_int_ip,
-        mac,
-        rtt, // Example: Include round-trip time if available
-        // Collect any other properties passed in hopData
-        ...otherDetails
-    } = hopData;
-
-    // Ensure hop number is present, default if necessary (though ideally it should always exist)
+    const { hop, ip, type, hostname, device_id, mac, rtt, ...otherDetails } = hopData;
     const hopNumber = typeof hop === 'number' ? hop : '?';
 
-    // --- Prepare Details for Popover ---
-    // Combine explicitly listed fields (for order/importance) with other details
-    const allDetails = {
-        // Explicitly list fields likely to be useful in popover, controlling order
-        IP: ip,
-        MAC: mac,
-        Type: type,
-        Hostname: hostname,
-        RTT: rtt ? `${rtt} ms` : undefined, // Format RTT if present
-        Device_ID: device_id,
-        VRF: vrf,
-        Destination_Network: destination_network,
-        Next_Hop_Interface: next_hop_interface,
-        Nexthop_Interface_IP: nexthop_int_ip,
-        Destination_MAC: destination_mac,
-        Destination_DG_IP: destination_dg_ip,
-        MPLS_Label: mpls_label,
-        Passed_Firewall: passed_firewall, // Booleans will be handled later
-        ...otherDetails, // Include any other non-null/empty fields dynamically
-    };
+    const allDetails = { IP: ip, MAC: mac, Type: type, Hostname: hostname, RTT: rtt ? `${rtt} ms` : undefined, Device_ID: device_id, ...otherDetails };
+    const detailsToShow = Object.entries(allDetails).filter(([_, value]) => value != null && value !== '');
 
-    // Filter out null, undefined, or empty string values
-    const detailsToShow = Object.entries(allDetails)
-        .filter(([key, value]) => value !== null && value !== undefined && value !== '');
-
-
-    // --- Determine Display Text ---
-    // Primary: Hostname > IP > MAC > 'Unknown Device'
     const primaryDisplay = hostname || ip || mac || 'Unknown Device';
-    // Secondary:
-    // - If hostname is primary: Show IP or MAC
-    // - If IP/MAC is primary: Show Type if available
-    // - Otherwise: null
     let secondaryDisplay = null;
-    if (hostname && (ip || mac)) {
-        secondaryDisplay = ip || mac; // Show IP first if both exist
-    } else if ((ip || mac) && type) {
-        secondaryDisplay = type;
-    }
+    if (hostname && (ip || mac)) { secondaryDisplay = ip || mac; }
+    else if ((ip || mac) && type) { secondaryDisplay = type; }
 
-    // Unique ID for ARIA attributes
     const popoverId = open ? `hop-popover-${hopNumber}-${ip || mac || 'unknown'}` : undefined;
+
+    const showForwardArrow = !isReversed && !isFirst;
+    const showBackwardArrow = isReversed && !isLast;
+    const arrowProps = { 'aria-hidden': "true", sx: { mx: { xs: 0.5, sm: 1 }, color: 'text.secondary', fontSize: { xs: '1rem', sm: '1.2rem' }, flexShrink: 0 } };
+
+    // --- Highlighting Logic ---
+    const highlightColor = isHighlightingActive && ip && ipColorMap.has(ip) ? ipColorMap.get(ip) : null;
+
+    // Use alpha blending for background, ensure sufficient contrast
+    // Adjust alpha value (0.2 - 0.4 is usually reasonable)
+    const highlightBgColor = highlightColor ? alpha(highlightColor, 0.3) : undefined;
+    // Use the direct color for the border
+    const highlightBorderColor = highlightColor || undefined;
+
 
     return (
         <Box sx={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-            {/* Arrow Connector (conditionally rendered) */}
-            {!isFirst && (
-                <ArrowForwardIcon
-                    aria-hidden="true" // Decorative element
-                    sx={{
-                        mx: { xs: 0.5, sm: 1 }, // Responsive margin
-                        color: 'text.secondary',
-                        fontSize: { xs: '1rem', sm: '1.2rem' }, // Responsive size
-                        flexShrink: 0, // Prevent arrow from shrinking
-                    }}
-                />
-            )}
-
-            {/* Hop Information Paper */}
+            {showForwardArrow && <ArrowForwardIcon {...arrowProps} />}
             <Paper
                 elevation={1}
                 variant="outlined"
@@ -2445,181 +2369,65 @@ const HopDisplay = ({ hopData, isFirst, isLast }) => {
                     minWidth: 180,
                     maxWidth: 250,
                     textAlign: 'center',
-                    position: 'relative', // For absolute positioning of button
-                    borderRadius: 1.5, // Slightly more rounded corners
-                    flexShrink: 0, // Prevent paper from shrinking excessively
-                    overflow: 'hidden', // Ensure content fits
+                    position: 'relative',
+                    borderRadius: 1.5,
+                    flexShrink: 0,
+                    overflow: 'hidden',
+                    transition: 'background-color 0.3s ease, border-color 0.3s ease',
+                    // Apply specific highlight color if active and IP matches
+                    bgcolor: highlightBgColor,
+                    borderColor: highlightBorderColor,
+                    // Optionally enhance border width when highlighted
+                    borderWidth: highlightBorderColor ? 2 : 1,
                 }}
             >
-                {/* Details Button (only show if there are details) */}
                 {detailsToShow.length > 0 && (
                     <Tooltip title="Show Details">
-                        {/* Position wrapper for Tooltip when button is disabled */}
                         <span>
-                            <IconButton
-                                aria-label={`Show details for hop ${hopNumber}`}
-                                size="small"
-                                onClick={handlePopoverOpen}
-                                aria-describedby={popoverId}
-                                // disabled={detailsToShow.length === 0} // Disabled state handled by conditional render
-                                sx={{
-                                    position: 'absolute',
-                                    top: 4,
-                                    right: 4,
-                                    p: '2px',
-                                    color: 'action.active', // Use theme color
-                                    '&:hover': {
-                                        // Optional: slightly darker on hover
-                                        // backgroundColor: 'action.hover',
-                                    },
-                                }}
-                            >
+                            <IconButton aria-label={`Show details for hop ${hopNumber}`} size="small" onClick={handlePopoverOpen} aria-describedby={popoverId} sx={{ position: 'absolute', top: 4, right: 4, p: '2px', color: 'action.active' }}>
                                 <InfoOutlinedIcon fontSize="inherit" />
                             </IconButton>
                         </span>
                     </Tooltip>
                 )}
-
-                {/* Stack for vertical layout of hop info */}
-                <Stack spacing={0.5} alignItems="center" sx={{ pt: detailsToShow.length > 0 ? 1.5 : 0 }}> {/* Add padding top if info icon exists */}
-                    {/* Hop Number Chip */}
-                    <Chip
-                        label={`Hop ${hopNumber}`}
-                        size="small"
-                        variant="outlined"
-                        color="primary" // Add subtle color
-                        sx={{ mb: 0.5, height: 20, fontSize: '0.7rem', fontWeight: 'medium' }}
-                    />
-
-                    {/* Primary Display (Hostname or IP/MAC) */}
+                <Stack spacing={0.5} alignItems="center" sx={{ pt: detailsToShow.length > 0 ? 1.5 : 0 }}>
+                    <Chip label={`Hop ${hopNumber}`} size="small" variant="outlined" color="primary" sx={{ mb: 0.5, height: 20, fontSize: '0.7rem', fontWeight: 'medium' }} />
                     <Tooltip title={primaryDisplay} enterDelay={1000}>
-                        <Typography
-                            variant="body2"
-                            sx={{
-                                fontWeight: 500,
-                                wordBreak: 'break-all', // Important for long names/IPs
-                                lineHeight: 1.3,
-                                // Optional: Add ellipsis for overflow if preferred
-                                // whiteSpace: 'nowrap',
-                                // overflow: 'hidden',
-                                // textOverflow: 'ellipsis',
-                                // maxWidth: '100%', // Needed for ellipsis
-                            }}
-                        >
-                            {primaryDisplay}
-                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 500, wordBreak: 'break-all', lineHeight: 1.3 }}> {primaryDisplay} </Typography>
                     </Tooltip>
-
-                    {/* Secondary Display (IP/MAC or Type) */}
                     {secondaryDisplay && (
                         <Tooltip title={secondaryDisplay} enterDelay={1000}>
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    color: 'text.secondary',
-                                    display: 'block',
-                                    wordBreak: 'break-all',
-                                    lineHeight: 1.2,
-                                    // Optional: Ellipsis for secondary display too
-                                    // whiteSpace: 'nowrap',
-                                    // overflow: 'hidden',
-                                    // textOverflow: 'ellipsis',
-                                    // maxWidth: '100%',
-                                }}
-                            >
-                                {secondaryDisplay}
-                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', wordBreak: 'break-all', lineHeight: 1.2 }}> {secondaryDisplay} </Typography>
                         </Tooltip>
                     )}
-
-                    {/* Chip for Type (if type exists and wasn't shown as secondary) */}
                     {type && secondaryDisplay !== type && (
-                        <Chip
-                            icon={getTypeIcon(type)}
-                            label={type}
-                            size="small"
-                            variant="filled" // Filled emphasizes type info
-                            color="default" // Or another appropriate color
-                            sx={{
-                                mt: 0.5,
-                                fontSize: '0.7rem',
-                                height: 'auto', // Auto height for variable content
-                                maxWidth: 'calc(100% - 16px)', // Prevent chip overflowing Paper padding
-                                '& .MuiChip-icon': { fontSize: '0.8rem', ml: 0.5 },
-                                '& .MuiChip-label': {
-                                    px: 0.8,
-                                    py: 0.2,
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    display: 'block', // Ensure label respects width
-                                }
-                            }}
-                        />
+                        <Chip icon={getTypeIcon(type)} label={type} size="small" variant="filled" color="default" sx={{ mt: 0.5, fontSize: '0.7rem', height: 'auto', maxWidth: 'calc(100% - 16px)', '& .MuiChip-icon': { fontSize: '0.8rem', ml: 0.5 }, '& .MuiChip-label': { px: 0.8, py: 0.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' } }} />
                     )}
                 </Stack>
             </Paper>
-
-            {/* Popover for Additional Details */}
+            {showBackwardArrow && <ArrowBackIcon {...arrowProps} />}
             <Popover
-                id={popoverId}
-                open={open}
-                anchorEl={anchorEl}
-                onClose={handlePopoverClose}
+                id={popoverId} open={open} anchorEl={anchorEl} onClose={handlePopoverClose}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
                 transformOrigin={{ vertical: 'top', horizontal: 'center' }}
-                slotProps={{
-                    paper: {
-                        elevation: 4,
-                        sx: {
-                            maxWidth: 350,
-                            p: 0, // Padding handled by ListItems
-                            borderRadius: 1.5,
-                            border: (theme) => `1px solid ${theme.palette.divider}`, // Subtle border
-                        }
-                    }
-                }}
+                slotProps={{ paper: { elevation: 4, sx: { maxWidth: 350, p: 0, borderRadius: 1.5, border: (theme) => `1px solid ${theme.palette.divider}` } } }}
             >
-                {/* Box containing Popover content */}
                 <Box>
-                    <Typography variant="subtitle2" sx={{ px: 2, pt: 1.5, pb: 1, fontWeight: 'bold' }}>
-                        Hop {hopNumber} Details
-                    </Typography>
+                    <Typography variant="subtitle2" sx={{ px: 2, pt: 1.5, pb: 1, fontWeight: 'bold' }}> Hop {hopNumber} Details </Typography>
                     <Divider />
-                    <List dense disablePadding sx={{ maxHeight: 350, overflowY: 'auto' }}> {/* Increased max height */}
+                    <List dense disablePadding sx={{ maxHeight: 350, overflowY: 'auto' }}>
                         {detailsToShow.map(([key, value]) => (
-                            <ListItem key={key} dense divider sx={{ py: 0.8, alignItems: 'flex-start' }}> {/* Align items start for long secondary text */}
+                            <ListItem key={key} dense divider sx={{ py: 0.8, alignItems: 'flex-start' }}>
                                 <ListItemText
                                     primary={formatDetailKey(key)}
-                                    secondary={
-                                        // Handle boolean display explicitly
-                                        typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value) // Ensure value is string for display
-                                    }
-                                    primaryTypographyProps={{
-                                        variant: 'caption',
-                                        fontWeight: 'medium',
-                                        color: 'text.secondary',
-                                        component: 'div', // Allow wrapping if needed
-                                    }}
-                                    secondaryTypographyProps={{
-                                        variant: 'body2',
-                                        color: 'text.primary',
-                                        sx: {
-                                            whiteSpace: 'pre-wrap', // Preserve whitespace and wrap
-                                            wordBreak: 'break-all', // Break long strings
-                                            lineHeight: 1.3, // Adjust line height for readability
-                                        }
-                                    }}
-                                    sx={{ my: 0 }} // Reset default margins
+                                    secondary={typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
+                                    primaryTypographyProps={{ variant: 'caption', fontWeight: 'medium', color: 'text.secondary', component: 'div' }}
+                                    secondaryTypographyProps={{ variant: 'body2', color: 'text.primary', sx: { whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.3 } }}
+                                    sx={{ my: 0 }}
                                 />
                             </ListItem>
                         ))}
-                        {/* Fallback message if filtering somehow removed all details (unlikely with current logic) */}
-                        {detailsToShow.length === 0 && (
-                            <ListItem dense>
-                                <ListItemText secondary="No additional details available." secondaryTypographyProps={{ variant: 'caption', fontStyle: 'italic', textAlign: 'center' }} />
-                            </ListItem>
-                        )}
+                        {detailsToShow.length === 0 && <ListItem dense><ListItemText secondary="No additional details available." secondaryTypographyProps={{ variant: 'caption', fontStyle: 'italic', textAlign: 'center' }} /></ListItem>}
                     </List>
                 </Box>
             </Popover>
@@ -2627,12 +2435,7 @@ const HopDisplay = ({ hopData, isFirst, isLast }) => {
     );
 };
 
-// Define PropTypes for type checking and documentation
 HopDisplay.propTypes = {
-    /**
-     * The data object for the hop. Requires at least a 'hop' number.
-     * Other fields like 'ip', 'hostname', 'type', etc., are used if present.
-     */
     hopData: PropTypes.shape({
         hop: PropTypes.number.isRequired,
         ip: PropTypes.string,
@@ -2640,24 +2443,21 @@ HopDisplay.propTypes = {
         hostname: PropTypes.string,
         type: PropTypes.string,
         rtt: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-        // Add other expected fields as needed
     }).isRequired,
-    /**
-     * Flag indicating if this is the first hop in the sequence (hides the preceding arrow).
-     */
     isFirst: PropTypes.bool,
-    /**
-     * Flag indicating if this is the last hop in the sequence (currently unused but good practice).
-     */
     isLast: PropTypes.bool,
+    isReversed: PropTypes.bool,
+    isHighlightingActive: PropTypes.bool,
+    ipColorMap: PropTypes.instanceOf(Map), // Map of IP -> color string
 };
 
-// Default props for flags
 HopDisplay.defaultProps = {
     isFirst: false,
     isLast: false,
+    isReversed: false,
+    isHighlightingActive: false,
+    ipColorMap: new Map(),
 };
-
 
 export default HopDisplay;
 
@@ -3152,14 +2952,23 @@ export default MacTraceVisualizer;
 // ----- File: src\components\RouteTrace\RouteComparisonContainer.jsx -----
 
 // ----- File: src\components\RouteTrace\RouteComparisonContainer.jsx -----
-// Update Grid component to use Grid v2 API
+
 import React from 'react';
 import { Box, Grid, Alert } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 // Generic container for side-by-side comparison of trace sections
-const RouteComparisonContainer = ({ traces = [], SectionComponent }) => {
-  // Check if a valid SectionComponent was provided
+// Now accepts and forwards view modes, reverse states, and highlighting info (including ipColorMap)
+const RouteComparisonContainer = ({
+    traces = [],
+    SectionComponent,
+    isMinimalView = false,
+    reversedStates = {},
+    onToggleReverse,
+    isHighlightingActive = false,
+    highlightedIPs = new Set(), // Keep this for potential quick checks if needed downstream
+    ipColorMap = new Map()      // New: Accept IP to Color mapping
+}) => {
   if (!SectionComponent) {
     console.error("RouteComparisonContainer requires a valid SectionComponent prop.");
     return (
@@ -3169,34 +2978,29 @@ const RouteComparisonContainer = ({ traces = [], SectionComponent }) => {
     );
   }
 
-  // Determine if the remove button should be shown in child sections
   const canRemove = traces.length > 1;
 
-  // Define responsive grid sizing using Grid v2 direct props
   let columnProps = {};
-  if (traces.length === 1) {
-      columnProps = { xs: 12 }; // Full width if only one
-  } else if (traces.length === 2) {
-      columnProps = { xs: 12, md: 6 }; // 2 columns on medium screens and up
-  } else if (traces.length === 3) {
-      columnProps = { xs: 12, md: 6, lg: 4 }; // 3 columns on large screens and up
-  } else { // 4 or more
-      columnProps = { xs: 12, sm: 6, md: 4, lg: 3 }; // Max 4 columns on large screens
-  }
-
+  if (traces.length === 1) columnProps = { xs: 12 };
+  else if (traces.length === 2) columnProps = { xs: 12, md: 6 };
+  else if (traces.length === 3) columnProps = { xs: 12, md: 6, lg: 4 };
+  else columnProps = { xs: 12, sm: 6, md: 4, lg: 3 };
 
   return (
     <Box sx={{ flexGrow: 1 }}>
-      {/* Use Grid container with appropriate spacing */}
-      {/* No 'item' prop needed on the container */}
       <Grid container spacing={{ xs: 2, md: 3 }}>
         {traces.map((trace) => (
-          // Child Grid components now use breakpoint props directly
-          // Removed the 'item' prop
           <Grid {...columnProps} key={trace.id}>
-             {/* Render the provided SectionComponent, passing the trace data and canRemove flag */}
-             {/* Ensure SectionComponent handles height/layout internally (e.g., height: '100%') */}
-             <SectionComponent trace={trace} canRemove={canRemove} />
+             <SectionComponent
+                trace={trace}
+                canRemove={canRemove}
+                isMinimalView={isMinimalView}
+                isReversed={reversedStates[trace.id] || false}
+                onToggleReverse={onToggleReverse}
+                isHighlightingActive={isHighlightingActive} // Pass down highlight state
+                highlightedIPs={highlightedIPs}             // Pass down IP set
+                ipColorMap={ipColorMap}                     // Pass down color map
+              />
           </Grid>
         ))}
       </Grid>
@@ -3205,7 +3009,6 @@ const RouteComparisonContainer = ({ traces = [], SectionComponent }) => {
 };
 
 export default RouteComparisonContainer;
-// ----- End File: src\components\RouteTrace\RouteComparisonContainer.jsx -----
 
 // ----- End File: src\components\RouteTrace\RouteComparisonContainer.jsx -----
 
@@ -3848,86 +3651,206 @@ export default AllRoutesPage;
 
 // ----- File: src\pages\ComparisonPage.jsx -----
 
-import React, { useState, useEffect } from 'react';
+// ----- File: src\pages\ComparisonPage.jsx -----
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Box, Typography, Alert, Paper } from '@mui/material';
+import {
+    Box, Typography, Alert, Paper, Stack, ToggleButton, Tooltip, Button,
+    colors, // Import MUI colors object
+    alpha // Import alpha for background colors
+} from '@mui/material';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import ViewCompactIcon from '@mui/icons-material/ViewCompact';
+import ViewHeadlineIcon from '@mui/icons-material/ViewHeadline';
+import PaletteIcon from '@mui/icons-material/Palette';
+import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import ComparisonSelector from '../components/Comparison/ComparisonSelector';
 import RouteComparisonContainer from '../components/RouteTrace/RouteComparisonContainer';
-import ComparisonItem from '../components/Comparison/ComparisonItem'; // ComparisonItem now uses universal visualizer
+import ComparisonItem from '../components/Comparison/ComparisonItem';
 import LoadingSpinner from '../components/Common/LoadingSpinner';
 import ErrorMessage from '../components/Common/ErrorMessage';
 import { fetchAllHistory, resetHistoryError } from '../store/slices/historySlice';
 
+// Define a palette of distinct colors for highlighting IPs
+// Using MUI color names. Adjust shades as needed (e.g., 400/500/600).
+const HIGHLIGHT_COLORS = [
+  colors.red[500],
+  colors.blue[500],
+  colors.green[600], // Darker green for better contrast potentially
+  colors.purple[500],
+  colors.orange[600],
+  colors.cyan[500],
+  colors.pink[400],
+  colors.teal[500],
+  colors.lime[700], // Darker lime
+  colors.indigo[400],
+  colors.amber[600],
+  colors.lightBlue[500],
+];
+
 const ComparisonPage = () => {
     const dispatch = useDispatch();
-    // Use allHistory which contains processed entries of all types
     const { allHistory, allHistoryStatus, error: historyError } = useSelector((state) => state.history);
-    // Store IDs of the routes selected for comparison
     const [selectedRouteIds, setSelectedRouteIds] = useState([]);
+    const [isMinimalView, setIsMinimalView] = useState(false);
+    const [reversedStates, setReversedStates] = useState({});
+    const [isHighlightingActive, setIsHighlightingActive] = useState(false);
 
-    // Fetch all history if it hasn't been fetched yet
     useEffect(() => {
-        if (allHistoryStatus === 'idle') {
+        if (allHistoryStatus === 'idle' || allHistoryStatus === 'failed') {
             dispatch(fetchAllHistory());
         }
-        // Optional: Reset error on unmount
-        // return () => { dispatch(resetHistoryError()); };
     }, [allHistoryStatus, dispatch]);
 
-    // Handler for when the selection in ComparisonSelector changes
+    const selectedRoutesData = useMemo(() => {
+        return allHistory.filter(route => selectedRouteIds.includes(route.id));
+    }, [allHistory, selectedRouteIds]);
+
+    // Calculate shared IPs and the color map
+    const { highlightedIPs, ipColorMap } = useMemo(() => {
+        if (selectedRoutesData.length <= 1) {
+            return { highlightedIPs: new Set(), ipColorMap: new Map() };
+        }
+
+        const ipCounts = new Map();
+        selectedRoutesData.forEach(trace => {
+            const allHops = [
+                ...(trace.mainRouteTrace || []),
+                ...(trace.sourceMacTrace || []),
+                ...(trace.destinationMacTrace || []),
+            ];
+            const uniqueIPsInTrace = new Set(allHops.map(hop => hop?.ip).filter(Boolean));
+            uniqueIPsInTrace.forEach(ip => {
+                ipCounts.set(ip, (ipCounts.get(ip) || 0) + 1);
+            });
+        });
+
+        const ipsToHighlight = new Set();
+        const colorMap = new Map();
+        let colorIndex = 0;
+
+        for (const [ip, count] of ipCounts.entries()) {
+            if (count > 1) {
+                ipsToHighlight.add(ip);
+                // Assign color from palette, wrapping around if necessary
+                colorMap.set(ip, HIGHLIGHT_COLORS[colorIndex % HIGHLIGHT_COLORS.length]);
+                colorIndex++;
+            }
+        }
+        // console.log("IPs to Highlight:", ipsToHighlight);
+        // console.log("IP Color Map:", colorMap);
+        return { highlightedIPs: ipsToHighlight, ipColorMap: colorMap };
+
+    }, [selectedRoutesData]); // Recalculate only when selected data changes
+
+
     const handleSelectionChange = (selectedIds) => {
         setSelectedRouteIds(selectedIds);
+        setIsHighlightingActive(false); // Reset highlighting on selection change
     };
 
-    // Filter the full history data based on the selected IDs
-    // This derived state will be passed to the comparison container
-    const selectedRoutesData = allHistory.filter(route => selectedRouteIds.includes(route.id));
+    const handleViewToggle = () => setIsMinimalView(!isMinimalView);
+    const handleHighlightToggle = () => setIsHighlightingActive(!isHighlightingActive);
+    const handleToggleReverse = (traceId) => {
+        setReversedStates(prev => ({ ...prev, [traceId]: !prev[traceId] }));
+    };
 
-    // Show loading spinner while fetching history
     if (allHistoryStatus === 'loading') {
         return <LoadingSpinner message="Loading route history..." />;
     }
 
+    const canCompare = selectedRoutesData.length >= 2;
+    const canHighlight = canCompare && highlightedIPs.size > 0;
+
     return (
         <Box>
-            <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 3 }}>
-                Compare Historical Traces
-            </Typography>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+                <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 0 }}>
+                    Compare Historical Traces
+                </Typography>
+                {allHistoryStatus === 'succeeded' && (
+                    <Stack direction="row" spacing={1}>
+                        {/* Highlight Toggle */}
+                        <Tooltip title={isHighlightingActive ? "Disable IP Highlighting" : (canHighlight ? "Highlight Common IPs (Unique Colors)" : "No common IPs found to highlight")}>
+                           <span>
+                             <ToggleButton
+                                value="highlight"
+                                selected={isHighlightingActive}
+                                onChange={handleHighlightToggle}
+                                size="small"
+                                aria-label="Toggle IP highlighting"
+                                disabled={!canHighlight} // Disable if < 2 traces or no IPs to highlight
+                            >
+                                {isHighlightingActive ? <PaletteIcon color="warning"/> : <PaletteOutlinedIcon />}
+                             </ToggleButton>
+                           </span>
+                        </Tooltip>
+                        {/* Minimal View Toggle */}
+                        <Tooltip title={isMinimalView ? "Show Full Details" : "Show Minimal View (Hops Only)"}>
+                           <span>
+                            <ToggleButton
+                                value="minimal"
+                                selected={isMinimalView}
+                                onChange={handleViewToggle}
+                                size="small"
+                                aria-label="Toggle minimal view"
+                                disabled={selectedRoutesData.length === 0}
+                            >
+                                {isMinimalView ? <ViewHeadlineIcon /> : <ViewCompactIcon />}
+                            </ToggleButton>
+                           </span>
+                        </Tooltip>
+                        {/* Reset View Button */}
+                        <Tooltip title="Reset Minimal View & Reversed Traces">
+                           <span>
+                             <Button
+                                size="small"
+                                variant='outlined'
+                                onClick={() => { setIsMinimalView(false); setReversedStates({}); }}
+                                disabled={selectedRoutesData.length === 0}
+                                sx={{ minWidth: 'auto', px: 1 }}
+                             >
+                                Reset View
+                             </Button>
+                            </span>
+                        </Tooltip>
+                    </Stack>
+                 )}
+             </Stack>
 
-            {/* Display error if history fetching failed */}
             {allHistoryStatus === 'failed' && (
                 <ErrorMessage error={historyError} title="Could not load route history" />
             )}
 
-            {/* Render selector and comparison container only if history loaded successfully */}
             {allHistoryStatus === 'succeeded' && (
                 <>
-                    {/* Component to select routes from the available history */}
                     <ComparisonSelector
-                        availableRoutes={allHistory} // Pass all history entries
+                        availableRoutes={allHistory}
                         selectedIds={selectedRouteIds}
                         onChange={handleSelectionChange}
                     />
 
-                    {/* Display the comparison container if routes are selected */}
                     {selectedRoutesData.length > 0 ? (
                          <Box sx={{ mt: 3 }}>
-                             {/* Container responsible for laying out the comparison items */}
                              <RouteComparisonContainer
-                                traces={selectedRoutesData} // Pass the filtered historical data
-                                SectionComponent={ComparisonItem} // ComparisonItem renders HistoryTraceVisualizer internally
+                                traces={selectedRoutesData}
+                                SectionComponent={ComparisonItem}
+                                isMinimalView={isMinimalView}
+                                reversedStates={reversedStates}
+                                onToggleReverse={handleToggleReverse}
+                                isHighlightingActive={isHighlightingActive} // Pass highlight state
+                                highlightedIPs={highlightedIPs}             // Pass set of IPs (still useful for check)
+                                ipColorMap={ipColorMap}                     // Pass the new color map
                              />
                          </Box>
                     ) : (
-                        // Show an informational message if no routes are selected yet
-                         <Alert
-                            severity="info"
-                            icon={<CompareArrowsIcon />}
-                            variant="outlined" // Use outlined for less emphasis
-                            sx={{ mt: 3 }}
-                         >
-                            Select two or more routes (Combined, Direct, or MAC) from the list above to compare them side-by-side.
+                         <Alert severity="info" icon={<CompareArrowsIcon />} variant="outlined" sx={{ mt: 3 }}>
+                            Select two or more routes from the list above to compare them side-by-side.
+                            Use the <PaletteOutlinedIcon fontSize='small' sx={{verticalAlign: 'bottom', mx: 0.5}}/> button (enabled when applicable) to highlight devices (by IP) appearing in multiple selected traces with unique colors.
+                            Use <ViewCompactIcon fontSize='small' sx={{verticalAlign: 'bottom', mx: 0.5}}/> to toggle a minimal view.
+                            Individual traces can be visually reversed using the swap icon (<SwapHorizIcon fontSize='small' sx={{verticalAlign: 'bottom'}}/>) in their header.
                          </Alert>
                     )}
                 </>
