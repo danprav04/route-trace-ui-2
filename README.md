@@ -36,6 +36,12 @@
     *   Secure login and authentication.
     *   Intelligent forms that automatically fetch gateway information.
 
+## 🤝 Companion Backend
+
+This frontend application is designed to work in tandem with our powerful backend API, which performs the actual network tracing and data management. For the full application to function, the backend service must be running and accessible.
+
+*   **Backend Repository:** [https://github.com/danprav04/route-trace-api/](https://github.com/danprav04/route-trace-api/)
+
 ## 🚀 How It Works
 
 The RouteTrace utility is a React-based single-page application (SPA) that communicates with a backend API to perform network traces.
@@ -143,3 +149,5 @@ route-trace-app/
 │   └── theme.js         # Material-UI theme configuration (light/dark modes)
 └── package.json
 ```
+
+---
