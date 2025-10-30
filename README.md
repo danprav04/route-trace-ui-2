@@ -12,7 +12,9 @@
 </p>
 
 <p align="center">
-  <em>[Screenshot of the main Combined Trace page with results displayed]</em>
+  <img width="1918" height="943" alt="image" src="https://github.com/user-attachments/assets/020b7317-9a7d-42db-9e7f-4871ee372dbf" />
+  <img width="1901" height="949" alt="image" src="https://github.com/user-attachments/assets/17c2b143-52a9-436a-bae7-bcf9f6fea2b7" />
+  <img width="1133" height="940" alt="image" src="https://github.com/user-attachments/assets/958bc18b-62d3-4434-80eb-84f4aaecf3e5" />
 </p>
 
 ## ✨ Key Features
